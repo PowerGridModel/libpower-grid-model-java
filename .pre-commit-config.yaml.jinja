@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+repos:
+  - repo: https://github.com/fsfe/reuse-tool  # outside pypi
+    rev: v6.2.0
+    hooks:
+      - id: reuse
+  - repo: https://github.com/igorshubovych/markdownlint-cli  # outside pypi 
+    rev: v{{ markdownlint_cli }}
+    hooks:
+      - id: markdownlint
+        args: ["--fix"]

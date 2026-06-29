@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+# Environments
+.env
+.env.local
+.env.*.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# VSCode configurations
+# it is ignored by default so the user does not accidentally change the configuration
+# if you want to changes the JSON file in .vscode folder
+# please type
+#    git add .vscode/ --force
+.vscode/
+
+# IDEs - Visual Studio, VS Code, JetBrains
+.idea/
+.vs/
+.vscode/
+*.sln.iml
+*.user
+*.sln.docstates
+.vscode-test/
+
+# JetBrains IDEs (IntelliJ, PyCharm, WebStorm, CLion, etc.)
+*.iml
+*.iws
+*.ipr
+*.iml
+out/
+
+# Visual Studio
+obj/
+bin/
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+# AI Agents & Copilot
+.claude/
+.copilot/
+.copilot-instructions/
+.ai/
+
+# Editor backups & temp files
+*.swp
+*.swo
+*~
+*.bak
+.sublime-project
+.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+.directory
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+site/
+*.egg-info/
+.ipynb_checkpoints/
+
+# C++ / CMake
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+*.dylib
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+Testing/
+
+# Java / JVM
+.gradle/
+target/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+.classpath
+.project
+.settings/
