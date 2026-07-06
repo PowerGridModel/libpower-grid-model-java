@@ -1,18 +1,48 @@
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
-group = 'org.example'
+group = 'org-power-grid-model'
 version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
 }
 
+def pgmVersion = "1.13.109"
+tasks.register('generatePowerGridModel', Exec) {
+    commandLine 'bash', 'generate-bindings.sh'
+    inputs.file('generate-bindings.sh')
+    inputs.property('pgmVersion', pgmVersion)
+    outputs.dir(layout.projectDirectory.dir('src/generated/java/org/lfenergy/pgm'))
+    outputs.dir(layout.projectDirectory.dir('src/generated/java/resources'))
+}
+
+tasks.named('compileJava') {
+    dependsOn(tasks.named('generatePowerGridModel'))
+}
+
+tasks.named('processResources') {
+    dependsOn(tasks.named('generatePowerGridModel'))
+}
+
 sourceSets {
     main {
         java {
             srcDir 'src/generated/java'
+        }
+        resources {
+            srcDir "src/generated/java/resources"
+        }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'lib-power-grid-model'
         }
     }
 }
