@@ -1,6 +1,13 @@
+import javax.inject.Inject
+
 plugins {
     id 'java'
     id 'maven-publish'
+}
+
+interface InjectedExecOps {
+    @Inject
+    ExecOperations getExecOperations()
 }
 
 group = 'org-power-grid-model'
@@ -11,31 +18,168 @@ repositories {
 }
 
 def pgmVersion = "1.13.109"
-tasks.register('generatePowerGridModel', Exec) {
-    commandLine 'bash', 'generate-bindings.sh'
-    inputs.file('generate-bindings.sh')
-    inputs.property('pgmVersion', pgmVersion)
-    outputs.dir(layout.projectDirectory.dir('src/generated/java/org/lfenergy/pgm'))
-    outputs.dir(layout.projectDirectory.dir('src/generated/java/resources'))
+
+def pgmDir = layout.buildDirectory.dir("pgm").get()
+def wheelDir = pgmDir.dir("download")
+def headersDir = pgmDir.dir("headers")
+def nativeLibDir = pgmDir.dir("lib")
+def generatedJavaDir = pgmDir.dir("generated-src")
+
+def architectures = [
+    "x86_64_macosx": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-macosx_13_0_x86_64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_macosx.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib/libpower_grid_model_c.dylib",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_macosx.dylib")
+    ],
+    "arm64_macosx": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-macosx_13_0_arm64.whl",
+        wheelFile: wheelDir.file("power_grid_model_arm64_macosx.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib/libpower_grid_model_c.dylib",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_arm64_macosx.dylib")
+    ],
+    "x86_64_windows": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-win_amd64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_windows.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/bin/power_grid_model_c.dll",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_windows.dll")
+    ],
+    "arm64_linux": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl",
+        wheelFile: wheelDir.file("power_grid_model_arm64_linux.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib64/libpower_grid_model_c.so",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_arm64_linux.so")
+    ],
+    "x86_64_linux": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_linux.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib64/libpower_grid_model_c.so",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_linux.so")
+    ]
+]
+
+tasks.register("extractPGMNativeLibsFromWheels") { }
+
+architectures.forEach { slug, architecture ->
+    def downloadWheelTaskName = "downloadPGMWheel_$slug"
+    def extractNativeLibTaskName = "extractPGMNativeLibFromWheel_$slug"
+
+    tasks.named("extractPGMNativeLibsFromWheels") {
+        dependsOn(tasks.named(extractNativeLibTaskName))
+    }
+
+    tasks.register(downloadWheelTaskName) {
+        GString url = architecture.url
+        RegularFile wheelFile = architecture.wheelFile
+
+        outputs.file(wheelFile)
+
+        doLast {
+            def target = wheelFile.asFile
+            target.parentFile.mkdirs()
+
+            URI.create(url).toURL().withInputStream { input ->
+                target.withOutputStream { output ->
+                    output << input
+                }
+            }
+        }
+    }
+
+    tasks.register(extractNativeLibTaskName, Copy) {
+        dependsOn(tasks.named(downloadWheelTaskName))
+
+        RegularFile wheelFile = architecture.wheelFile
+        RegularFile nativeLibFile = architecture.nativeLibFile
+        String nativeLibFilename = nativeLibFile.asFile.name
+        String nativeLibPathInWheel = architecture.nativeLibPathInWheel
+
+        // Ensure the target directory exists before extracting the library
+        doFirst {
+            nativeLibDir.asFile.mkdirs()
+        }
+
+        // Register the file as an output of the task to ensure Gradle tracks it correctly
+        outputs.file(nativeLibFile)
+
+        from(zipTree(wheelFile)) {
+            include nativeLibPathInWheel
+
+            eachFile { FileCopyDetails details ->
+                if (details.path == null) {
+                    return
+                }
+                println(details.path)
+                details.path = nativeLibFilename
+            }
+        }
+
+        includeEmptyDirs false
+        into(nativeLibDir)
+    }
 }
 
-tasks.named('compileJava') {
-    dependsOn(tasks.named('generatePowerGridModel'))
+tasks.register("extractPGMHeaderFiles", Copy) {
+    dependsOn(tasks.named("extractPGMNativeLibFromWheel_x86_64_linux"))
+
+    RegularFile wheelFile = architectures.x86_64_linux.wheelFile
+
+    doFirst {
+        headersDir.asFile.mkdirs()
+    }
+
+    def internalBaseDir = "power_grid_model/_core/power_grid_model_c/include"
+    from(zipTree(wheelFile)) {
+        include "$internalBaseDir/**/*.h"
+
+        eachFile { FileCopyDetails details ->
+            if (details.path == null) {
+                return
+            }
+
+            details.path = details.path.replace("$internalBaseDir/", "")
+        }
+    }
+    includeEmptyDirs false
+    into headersDir
 }
 
-tasks.named('processResources') {
-    dependsOn(tasks.named('generatePowerGridModel'))
+def jextractBin = project.property("jextract_bin")
+tasks.register("generatePGMBindings") {
+    dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
+    dependsOn(tasks.named('extractPGMHeaderFiles'))
+
+    def execOps = project.objects.newInstance(InjectedExecOps)
+
+    doLast {
+        execOps.execOperations.exec {
+            commandLine jextractBin,
+                "--output", generatedJavaDir,
+                "--target-package", "org.lfenergy.pgm",
+                "--header-class-name", "PowerGridModelC",
+                "$headersDir/power_grid_model_c.h",
+                "$headersDir/power_grid_model_c/dataset_definitions.h"
+        }
+    }
 }
 
 sourceSets {
     main {
         java {
-            srcDir 'src/generated/java'
+            srcDir generatedJavaDir
         }
         resources {
-            srcDir "src/generated/java/resources"
+            srcDir headersDir
         }
     }
+}
+
+tasks.named('compileJava') {
+    dependsOn(tasks.named('generatePGMBindings'))
+}
+
+tasks.named('processResources') {
+    dependsOn(tasks.named('generatePGMBindings'))
 }
 
 publishing {
