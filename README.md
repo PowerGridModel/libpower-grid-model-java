@@ -6,11 +6,24 @@ SPDX-License-Identifier: MPL-2.0
 
 [![Power Grid Model logo](https://raw.githubusercontent.com/PowerGridModel/.github/main/artwork/svg/color.svg)](#)
 
-# Power Grid Model template repository
+# libpower-grid-model-java
 
-This is a template repository for the Power Grid Model project.
-Only common and mandatory content is included in this repository.
-The derived repositories should review and edit content relevant to the best practices and standards. 
+## Usage
+
+The PGM methods are available through class `org.lfenergy.pgm.PowerGridModelC`. The method names are identical to the method names in the C-documentation.
+
+To load the native library there are two options:
+- on supported architectures, the library can be autoloaded using `PGMLoader.autoload()`
+- on other architecture, you can build and load the library yourself using `System.load(...)`, and verify if you've loaded it correctly using `PGMLoader.verifyLoaded()`.
+
+## Supported architectures
+
+- Mac OS ARM64 (Apple with M1 chip and newer)
+- Mac OS x86-64 (Apple with Intel chips)
+- Linux ARM64 (e.g. Snapdragon CPU)
+- Linux x86-64 (Intel, AMD, etc.)
+- Windows x86-64 (Intel, AMD, etc.)
+
 
 ## Checklist after creating a repository from this template
 
