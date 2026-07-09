@@ -58,7 +58,12 @@ def architectures = [
     ]
 ]
 
-tasks.register("extractPGMNativeLibsFromWheels") { }
+
+tasks.register("extractPGMNativeLibsFromWheels") {
+    doLast {
+        nativeLibDir.file("version").asFile.write(pgmVersion)
+    }
+}
 
 architectures.forEach { slug, architecture ->
     def downloadWheelTaskName = "downloadPGMWheel_$slug"
@@ -144,21 +149,105 @@ tasks.register("extractPGMHeaderFiles", Copy) {
     into headersDir
 }
 
-def jextractBin = project.property("jextract_bin")
+
+def jextractDir = layout.buildDirectory.dir("jextract").get()
+def jextractArchive = jextractDir.file("jextract.tar.gz")
+
+def osName = System.getProperty("os.name").toLowerCase()
+def osArch = System.getProperty("os.arch").toLowerCase()
+
+def jextractUrlPropertyKey = {
+    if (osName.contains("linux")) {
+        return osArch in ["aarch64", "arm64"]
+                ? "jextract_linux_aarch64_url"
+                : "jextract_linux_x64_url"
+    }
+
+    if (osName.contains("mac")) {
+        return osArch in ["aarch64", "arm64"]
+                ? "jextract_macos_aarch64_url"
+                : "jextract_macos_x64_url"
+    }
+
+    if (osName.contains("windows")) {
+        if (!(osArch in ["amd64", "x86_64"])) {
+            throw new GradleException(
+                    "Unsupported Windows architecture: $osArch"
+            )
+        }
+
+        return "jextract_windows_x64_url"
+    }
+
+    throw new GradleException(
+            "Unsupported platform: $osName / $osArch"
+    )
+}()
+
+def jextractUrl = project.property(jextractUrlPropertyKey)
+
+tasks.register("downloadJextract") {
+    outputs.file(jextractArchive)
+    doLast {
+        def target = jextractArchive.asFile
+        target.parentFile.mkdirs()
+        URI.create(jextractUrl).toURL().withInputStream { input ->
+            target.withOutputStream { output ->
+                output << input
+            }
+        }
+    }
+}
+
+tasks.register("extractJextract", Copy) {
+    dependsOn(tasks.named("downloadJextract"))
+    from tarTree(resources.gzip(jextractArchive.asFile))
+    into jextractDir
+}
+
 tasks.register("generatePGMBindings") {
+    // Use a local jextract installation by setting jextract_bin in gradle.properties,
+    // otherwise jextract is downloaded and extracted automatically.
+    def localJextractBin = project.findProperty("jextract_bin")
+    if (!localJextractBin) {
+        dependsOn(tasks.named('extractJextract'))
+    }
     dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
     dependsOn(tasks.named('extractPGMHeaderFiles'))
-
     def execOps = project.objects.newInstance(InjectedExecOps)
-
+    inputs.files(
+            headersDir.file("power_grid_model_c.h"),
+            headersDir.file("power_grid_model_c/dataset_definitions.h")
+    )
+    outputs.dir(generatedJavaDir)
     doLast {
+        def jextractBin
+        if (localJextractBin) {
+            jextractBin = file(localJextractBin)
+        } else {
+            def executableName = osName.contains("windows")
+                    ? "jextract.exe"
+                    : "jextract"
+            def jextractBins = fileTree(jextractDir) {
+                include "**/bin/$executableName"
+            }.files
+            if (jextractBins.size() != 1) {
+                throw new GradleException(
+                        "Expected exactly one Jextract executable, " +
+                                "but found ${jextractBins.size()}: $jextractBins"
+                )
+            }
+            jextractBin = jextractBins.first()
+        }
         execOps.execOperations.exec {
             commandLine jextractBin,
-                "--output", generatedJavaDir,
-                "--target-package", "org.lfenergy.pgm",
-                "--header-class-name", "PowerGridModelC",
-                "$headersDir/power_grid_model_c.h",
-                "$headersDir/power_grid_model_c/dataset_definitions.h"
+                    "--output", generatedJavaDir,
+                    "--target-package", "org.lfenergy.pgm",
+                    "--header-class-name", "PowerGridModelC",
+                    headersDir.file("power_grid_model_c.h").asFile,
+                    headersDir.file(
+                            "power_grid_model_c/dataset_definitions.h"
+                    ).asFile
         }
     }
 }
@@ -169,7 +258,7 @@ sourceSets {
             srcDir generatedJavaDir
         }
         resources {
-            srcDir headersDir
+            srcDir nativeLibDir
         }
     }
 }
@@ -196,11 +285,16 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    compileOnly 'org.projectlombok:lombok:1.18.46'
-    annotationProcessor 'org.projectlombok:lombok:1.18.46'
+    testImplementation platform('org.mockito:mockito-bom:5.23.0')
+    testRuntimeOnly 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
 
-    testCompileOnly 'org.projectlombok:lombok:1.18.46'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
+//
+//    compileOnly 'org.projectlombok:lombok:1.18.46'
+//    annotationProcessor 'org.projectlombok:lombok:1.18.46'
+//
+//    testCompileOnly 'org.projectlombok:lombok:1.18.46'
+//    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
 }
 
 test {
