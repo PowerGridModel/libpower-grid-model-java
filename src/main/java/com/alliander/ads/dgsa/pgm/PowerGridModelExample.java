@@ -6,7 +6,7 @@ package com.alliander.ads.dgsa.pgm;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
-import org.lfenergy.pgm.PGMLoader;
+import org.lfenergy.pgm.loader.PGMLoader;
 import org.lfenergy.pgm.PowerGridModelC;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -22,8 +22,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class PowerGridModelExample {
 
-    public static void main(String[] args) {
-        PGMLoader.autoload();
+    static void main() {
+        PGMLoader loader = new PGMLoader();
+
+        loader.autoload();
+
+        // when autoload is used, this is not needed, as autoload already performs this check
+        loader.check(true);
 
         System.out.println("\nThis is a Java FFM example calling the Power Grid Model C API.");
         runExample();
