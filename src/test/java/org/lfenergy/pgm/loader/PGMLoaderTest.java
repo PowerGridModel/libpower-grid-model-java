@@ -34,19 +34,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 public class PGMLoaderTest {
 
     @Mock
-    PlatformDetector platformDetector;
+    private PlatformDetector platformDetector;
 
     @Mock
-    ResourceLibraryLoader resourceLibraryLoader;
+    private ResourceLibraryLoader resourceLibraryLoader;
 
     @Mock
-    PGMInvoker pgmInvoker;
+    private PGMInvoker pgmInvoker;
 
     @InjectMocks
     private PGMLoader pgmLoader;
 
     @Captor
-    ArgumentCaptor<String> resourceLibraryLoaderCaptor;
+    private ArgumentCaptor<String> resourceLibraryLoaderCaptor;
 
     private static String pgmBuildVersion;
     private static MemorySegment pgmBuildVersionPointer;
@@ -55,13 +55,12 @@ public class PGMLoaderTest {
     static void beforeAll() {
         final InputStream ris = PGMLoader.class.getResourceAsStream("/version");
 
-        try (final InputStream is = new BufferedInputStream(ris)) {
+        try (InputStream is = new BufferedInputStream(ris)) {
             pgmBuildVersion = new String(is.readAllBytes(), UTF_8);
             pgmBuildVersionPointer = createNullTerminatedString(pgmBuildVersion);
         } catch (IOException e) {
             throw new RuntimeException("Unexpected: failed to read version resource", e);
         }
-
     }
 
     @MethodSource("testAutoloadProvider")
@@ -149,7 +148,7 @@ public class PGMLoaderTest {
         ByteBuffer buffer = UTF_8.encode(string);
         byte[] bytes = new byte[buffer.remaining() + 1];
         buffer.get(bytes, 0, buffer.remaining());
-        bytes[bytes.length - 1] = (byte)0;
+        bytes[bytes.length - 1] = (byte) 0;
         return MemorySegment.ofArray(bytes);
     }
 }

@@ -17,13 +17,16 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Network topology: source_0 --node_1---- sym_load_2 | |---- sym_load_3
  * <p>
  * NOTE: The generated PowerGridModelC_1 class hardcodes the .so path at generation time. If the library has moved, re-run jextract or update SYMBOL_LOOKUP manually.
- * <p>
- * Run with: java --enable-native-access=ALL-UNNAMED -ea -cp <classpath> org.lfenergy.pgm.example.PowerGridModelExample
  */
-public class PowerGridModelExample {
+@SuppressWarnings({"PMD.SystemPrintln", })
+public final class PowerGridModelExample {
+
+    private PowerGridModelExample() {
+        // Prevent initialization
+    }
 
     static void main() {
-        PGMLoader loader = new PGMLoader();
+        final PGMLoader loader = new PGMLoader();
 
         loader.autoload();
 
@@ -36,8 +39,12 @@ public class PowerGridModelExample {
 
     // -------------------------------------------------------------------------
 
+    @SuppressWarnings({"checkstyle:MagicNumber", "checkstyle:MethodLength",
+        "PMD.NcssCount",
+        "PMD.CognitiveComplexity",
+        "PMD.VariableDeclarationUsageDistance"})
     private static void runExample() {
-        MemorySegment handle = PowerGridModelC.PGM_create_handle();
+        final MemorySegment handle = PowerGridModelC.PGM_create_handle();
 
         MemorySegment nodeInput = MemorySegment.NULL;
         MemorySegment symLoadInput = MemorySegment.NULL;
@@ -62,31 +69,31 @@ public class PowerGridModelExample {
             symLoadInput = PowerGridModelC.PGM_create_buffer(handle, PowerGridModelC.PGM_def_input_sym_load(), 2);
             ensureNoError(handle);
 
-            long sourceSize = PowerGridModelC.PGM_meta_component_size(handle, PowerGridModelC.PGM_def_input_source());
-            long sourceAlignment = PowerGridModelC.PGM_meta_component_alignment(handle, PowerGridModelC.PGM_def_input_source());
-            MemorySegment sourceInput = arena.allocate(sourceSize, sourceAlignment);
+            final long sourceSize = PowerGridModelC.PGM_meta_component_size(handle, PowerGridModelC.PGM_def_input_source());
+            final long sourceAlignment = PowerGridModelC.PGM_meta_component_alignment(handle, PowerGridModelC.PGM_def_input_source());
+            final MemorySegment sourceInput = arena.allocate(sourceSize, sourceAlignment);
 
             // ---- assign input attributes ----
-            long nodeIdOffset = PowerGridModelC.PGM_meta_attribute_offset(handle, PowerGridModelC.PGM_def_input_node_id());
-            long nodeURatedOffset = PowerGridModelC.PGM_meta_attribute_offset(handle, PowerGridModelC.PGM_def_input_node_u_rated());
+            final long nodeIdOffset = PowerGridModelC.PGM_meta_attribute_offset(handle, PowerGridModelC.PGM_def_input_node_id());
+            final long nodeURatedOffset = PowerGridModelC.PGM_meta_attribute_offset(handle, PowerGridModelC.PGM_def_input_node_u_rated());
             nodeInput.set(PowerGridModelC.PGM_ID, nodeIdOffset, 1);
             nodeInput.set(PowerGridModelC.C_DOUBLE, nodeURatedOffset, 10e3);
 
             PowerGridModelC.PGM_buffer_set_nan(handle, PowerGridModelC.PGM_def_input_source(), sourceInput, 0, 1);
 
-            MemorySegment sourceId = arena.allocate(PowerGridModelC.PGM_ID);
+            final MemorySegment sourceId = arena.allocate(PowerGridModelC.PGM_ID);
             sourceId.set(PowerGridModelC.PGM_ID, 0, 0);
 
-            MemorySegment node = arena.allocate(PowerGridModelC.PGM_ID);
+            final MemorySegment node = arena.allocate(PowerGridModelC.PGM_ID);
             node.set(PowerGridModelC.PGM_ID, 0, 1);
 
-            MemorySegment status = arena.allocate(PowerGridModelC.C_CHAR);
+            final MemorySegment status = arena.allocate(PowerGridModelC.C_CHAR);
             status.set(PowerGridModelC.C_CHAR, 0, (byte) 1);
 
-            MemorySegment uRef = arena.allocate(PowerGridModelC.C_DOUBLE);
+            final MemorySegment uRef = arena.allocate(PowerGridModelC.C_DOUBLE);
             uRef.set(PowerGridModelC.C_DOUBLE, 0, 1.0);
 
-            MemorySegment sk = arena.allocate(PowerGridModelC.C_DOUBLE);
+            final MemorySegment sk = arena.allocate(PowerGridModelC.C_DOUBLE);
             sk.set(PowerGridModelC.C_DOUBLE, 0, 1e6);
 
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_input_source_id(), sourceInput, sourceId, 0, 1, -1);
@@ -96,14 +103,14 @@ public class PowerGridModelExample {
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_input_source_sk(), sourceInput, sk, 0, 1, -1);
             ensureNoError(handle);
 
-            int[] symLoadId = {2, 3};
-            MemorySegment symLoadIdSeg = toNativeIntArray(arena, symLoadId);
+            final int[] symLoadId = {2, 3};
+            final MemorySegment symLoadIdSeg = toNativeIntArray(arena, symLoadId);
 
-            MemorySegment loadType = arena.allocate(PowerGridModelC.C_CHAR);
+            final MemorySegment loadType = arena.allocate(PowerGridModelC.C_CHAR);
             loadType.set(PowerGridModelC.C_CHAR, 0, (byte) 0);
 
-            double[] pqSpecified = {50e3, 10e3, 100e3, 20e3};
-            MemorySegment pqSpecifiedSeg = toNativeDoubleArray(arena, pqSpecified);
+            final double[] pqSpecified = {50e3, 10e3, 100e3, 20e3};
+            final MemorySegment pqSpecifiedSeg = toNativeDoubleArray(arena, pqSpecified);
 
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_input_sym_load_id(), symLoadInput, symLoadIdSeg, 0, 2, -1);
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_input_sym_load_node(), symLoadInput, node, 0, 2, 0);
@@ -127,8 +134,8 @@ public class PowerGridModelExample {
             nodeOutput = PowerGridModelC.PGM_create_buffer(handle, PowerGridModelC.PGM_def_sym_output_node(), 3);
             ensureNoError(handle);
 
-            MemorySegment uPuSeg = arena.allocate(3L * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
-            MemorySegment uAngleSeg = arena.allocate(3L * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
+            final MemorySegment uPuSeg = arena.allocate(3L * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
+            final MemorySegment uAngleSeg = arena.allocate(3L * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
 
             singleOutputDataset = PowerGridModelC.PGM_create_dataset_mutable(handle, arena.allocateFrom("sym_output"), 0, 1);
             PowerGridModelC.PGM_dataset_mutable_add_buffer(handle, singleOutputDataset, arena.allocateFrom("node"), 1, 1, MemorySegment.NULL, nodeOutput);
@@ -164,20 +171,20 @@ public class PowerGridModelExample {
             ensureNoError(handle);
             PowerGridModelC.PGM_buffer_set_nan(handle, PowerGridModelC.PGM_def_update_source(), sourceUpdate, 0, 3);
 
-            double[] uRefUpdate = {0.95, 1.05, 1.1};
-            MemorySegment uRefUpdateSeg = toNativeDoubleArray(arena, uRefUpdate);
+            final double[] uRefUpdate = {0.95, 1.05, 1.1};
+            final MemorySegment uRefUpdateSeg = toNativeDoubleArray(arena, uRefUpdate);
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_update_source_id(), sourceUpdate, sourceId, 0, 3, 0);
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_update_source_u_ref(), sourceUpdate, uRefUpdateSeg, 0, 3, -1);
 
             loadUpdate = PowerGridModelC.PGM_create_buffer(handle, PowerGridModelC.PGM_def_update_sym_load(), 4);
             PowerGridModelC.PGM_buffer_set_nan(handle, PowerGridModelC.PGM_def_update_sym_load(), loadUpdate, 0, 4);
 
-            int[] loadUpdateId = {2, 3, 2, 3};
-            double[] pUpdate = {100e3, 200e3, 0.0, -200e3};
-            long[] indptrLoad = {0, 2, 3, 4};
-            MemorySegment loadUpdateIdSeg = toNativeIntArray(arena, loadUpdateId);
-            MemorySegment pUpdateSeg = toNativeDoubleArray(arena, pUpdate);
-            MemorySegment indptrLoadSeg = toNativeLongArray(arena, indptrLoad);
+            final int[] loadUpdateId = {2, 3, 2, 3};
+            final double[] pUpdate = {100e3, 200e3, 0.0, -200e3};
+            final long[] indptrLoad = {0, 2, 3, 4};
+            final MemorySegment loadUpdateIdSeg = toNativeIntArray(arena, loadUpdateId);
+            final MemorySegment pUpdateSeg = toNativeDoubleArray(arena, pUpdate);
+            final MemorySegment indptrLoadSeg = toNativeLongArray(arena, indptrLoad);
 
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_update_sym_load_id(), loadUpdate, loadUpdateIdSeg, 0, 4, -1);
             PowerGridModelC.PGM_buffer_set_value(handle, PowerGridModelC.PGM_def_update_sym_load_p_specified(), loadUpdate, pUpdateSeg, 0, 4, -1);
@@ -214,12 +221,12 @@ public class PowerGridModelExample {
             System.out.println("\nBatch Calculation Error");
             System.out.printf("Error code: %d%n", PowerGridModelC.PGM_error_code(handle));
 
-            long nFailedScenarios = PowerGridModelC.PGM_n_failed_scenarios(handle);
-            MemorySegment failedScenarios = PowerGridModelC.PGM_failed_scenarios(handle);
-            MemorySegment batchErrs = PowerGridModelC.PGM_batch_errors(handle);
+            final long nFailedScenarios = PowerGridModelC.PGM_n_failed_scenarios(handle);
+            final MemorySegment failedScenarios = PowerGridModelC.PGM_failed_scenarios(handle);
+            final MemorySegment batchErrs = PowerGridModelC.PGM_batch_errors(handle);
             for (int i = 0; i < nFailedScenarios; i++) {
-                long failedScenario = failedScenarios.getAtIndex(PowerGridModelC.PGM_Idx, i);
-                MemorySegment errorPtr = batchErrs.getAtIndex(PowerGridModelC.C_POINTER, i);
+                final long failedScenario = failedScenarios.getAtIndex(PowerGridModelC.PGM_Idx, i);
+                final MemorySegment errorPtr = batchErrs.getAtIndex(PowerGridModelC.C_POINTER, i);
                 System.out.printf("Failed scenario %d, error message: %s%n", failedScenario, cString(errorPtr));
             }
 
@@ -267,7 +274,7 @@ public class PowerGridModelExample {
     }
 
     private static void ensureNoError(MemorySegment handle) {
-        long errorCode = PowerGridModelC.PGM_error_code(handle);
+        final long errorCode = PowerGridModelC.PGM_error_code(handle);
         if (errorCode != PowerGridModelC.PGM_no_error()) {
             throw new IllegalStateException(
                     "PGM error " + errorCode + ": " + cString(PowerGridModelC.PGM_error_message(handle))
@@ -282,24 +289,24 @@ public class PowerGridModelExample {
         return cStringPtr.getString(0, UTF_8);
     }
 
-    private static MemorySegment toNativeIntArray(Arena arena, int[] values) {
-        MemorySegment segment = arena.allocate((long) values.length * PowerGridModelC.C_INT.byteSize(), PowerGridModelC.C_INT.byteAlignment());
+    private static MemorySegment toNativeIntArray(Arena arena, int... values) {
+        final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_INT.byteSize(), PowerGridModelC.C_INT.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_INT, i, values[i]);
         }
         return segment;
     }
 
-    private static MemorySegment toNativeDoubleArray(Arena arena, double[] values) {
-        MemorySegment segment = arena.allocate((long) values.length * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
+    private static MemorySegment toNativeDoubleArray(Arena arena, double... values) {
+        final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_DOUBLE, i, values[i]);
         }
         return segment;
     }
 
-    private static MemorySegment toNativeLongArray(Arena arena, long[] values) {
-        MemorySegment segment = arena.allocate((long) values.length * PowerGridModelC.C_LONG_LONG.byteSize(), PowerGridModelC.C_LONG_LONG.byteAlignment());
+    private static MemorySegment toNativeLongArray(Arena arena, long... values) {
+        final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_LONG_LONG.byteSize(), PowerGridModelC.C_LONG_LONG.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_LONG_LONG, i, values[i]);
         }

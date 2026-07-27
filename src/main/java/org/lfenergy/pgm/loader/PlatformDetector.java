@@ -26,15 +26,15 @@ class PlatformDetector {
 
     Platform detectPlatform() {
 
-        OperatingSystem operatingSystem = detectOperatingSystem(systemPropertyProvider.getOsName());
-        Architecture architecture = detectArchitecture(systemPropertyProvider.getOsArch());
+        final OperatingSystem operatingSystem = detectOperatingSystem(systemPropertyProvider.getOsName());
+        final Architecture architecture = detectArchitecture(systemPropertyProvider.getOsArch());
 
         return new Platform(operatingSystem, architecture);
     }
 
     private Architecture detectArchitecture(final String osArch) {
 
-        String normalized = osArch == null ? "" : osArch.toLowerCase();
+        final String normalized = osArch == null ? "" : osArch.toLowerCase();
 
         return switch (normalized) {
             case "aarch64", "arm64" -> Architecture.ARM64;
@@ -44,9 +44,9 @@ class PlatformDetector {
     }
 
     private OperatingSystem detectOperatingSystem(final String osName) {
-        String normalized = osName == null ? "" : osName.toLowerCase();
+        final String normalized = osName == null ? "" : osName.toLowerCase();
 
-        if (normalized.contains("mac") || normalized.contains("darwin")) {
+        if (normalized.contains("mac")) {
             return OperatingSystem.MACOS;
         }
         if (normalized.contains("linux")) {

@@ -26,13 +26,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 public class ResourceLibraryLoaderTest {
 
     @Mock
-    ResourceLibraryLoader.Dependencies dependencies;
+    private ResourceLibraryLoader.Dependencies dependencies;
 
     @InjectMocks
-    ResourceLibraryLoader resourceLibraryLoader;
+    private ResourceLibraryLoader resourceLibraryLoader;
 
     @Captor
-    ArgumentCaptor<String> systemLoadCaptor;
+    private ArgumentCaptor<String> systemLoadCaptor;
 
     /**
      * Checks if the resource file exists.

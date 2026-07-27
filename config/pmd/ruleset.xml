@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<ruleset name="DSA Rules">
+    <description>
+        PMD rules for the Dynamic Safety Analyzer
+    </description>
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="GuardLogStatement"/>
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="CommentDefaultAccessModifier"/>
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="AtLeastOneConstructor"/>
+        <exclude name="UnnecessaryFullyQualifiedName"/>
+        <exclude name="ConfusingTernary"/>
+        <exclude name="UselessParentheses"/>
+        <exclude name="ShortClassName"/>
+        <exclude name="TooManyStaticImports"/>
+    </rule>
+    <rule ref="category/java/design.xml">
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="NPathComplexity"/>
+        <exclude name="LawOfDemeter"/>
+        <exclude name="AvoidDeeplyNestedIfStmts"/>
+        <exclude name="AvoidCatchingGenericException"/>
+        <exclude name="ExcessiveImports"/>
+        <exclude name="ExcessiveParameterList"/>
+        <exclude name="TooManyMethods"/>
+        <exclude name="TooManyFields"/>
+        <exclude name="GodClass"/>
+      <exclude name="DataClass"/>
+        <exclude name="LoosePackageCoupling"/>
+        <exclude name="CollapsibleIfStatements"/>
+        <exclude name="SimplifyBooleanReturns"/>
+    </rule>
+    <rule ref="category/java/documentation.xml">
+        <exclude name="CommentRequired"/>
+        <exclude name="CommentSize"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml">
+        <exclude name="NullAssignment"/>
+      <exclude name="UseLocaleWithCaseConversions"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml/CloseResource">
+        <properties>
+          <property name="types" value="java.sql.Connection,java.sql.Statement,java.sql.ResultSet"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/multithreading.xml">
+        <exclude name="UseConcurrentHashMap"/>
+    </rule>
+    <rule ref="category/java/performance.xml"/>
+    <rule ref="category/java/security.xml"/>
+    <rule ref="category/java/codestyle.xml/ClassNamingConventions">
+        <properties>
+          <property name="utilityClassPattern" value="([A-Z][a-zA-Z0-9]+(Utils?|Helper|Event)|Constants)"/>
+        </properties>
+    </rule>
+</ruleset>

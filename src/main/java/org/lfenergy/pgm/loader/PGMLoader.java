@@ -1,8 +1,8 @@
 package org.lfenergy.pgm.loader;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.lfenergy.pgm.loader.Architecture.*;
-import static org.lfenergy.pgm.loader.OperatingSystem.*;
+import static org.lfenergy.pgm.loader.Architecture.ARM64;
+import static org.lfenergy.pgm.loader.OperatingSystem.WINDOWS;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -14,15 +14,14 @@ import org.lfenergy.pgm.PowerGridModelC;
 
 public class PGMLoader {
 
-    PlatformDetector platformDetector;
-    ResourceLibraryLoader resourceLibraryLoader;
-    PGMInvoker pgmInvoker;
+    private final PlatformDetector platformDetector;
+    private final ResourceLibraryLoader resourceLibraryLoader;
+    private final PGMInvoker pgmInvoker;
 
     // Thread-safe state
     private final AtomicReference<String> pgmBuildVersion = new AtomicReference<>();
     private final AtomicReference<String> pgmRuntimeVersion = new AtomicReference<>();
     private final AtomicBoolean loaded = new AtomicBoolean(false);
-
 
     public PGMLoader() {
         this(new PlatformDetector(), new ResourceLibraryLoader(), PowerGridModelC::PGM_version);
@@ -52,10 +51,10 @@ public class PGMLoader {
 
         if (loaded.compareAndSet(false, true)) {
             // Detect platform
-            Platform platform = platformDetector.detectPlatform();
+            final Platform platform = platformDetector.detectPlatform();
 
             // Determine resource path for library
-            String libraryResourcePath = determineLibraryResourcePath(platform);
+            final String libraryResourcePath = determineLibraryResourcePath(platform);
 
             // Load library
             resourceLibraryLoader.loadResourceLibrary(libraryResourcePath);
@@ -82,6 +81,7 @@ public class PGMLoader {
         }
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public String getPGMRuntimeVersion() {
 
         if (pgmRuntimeVersion.get() != null) {
@@ -103,12 +103,12 @@ public class PGMLoader {
             return pgmBuildVersion.get();
         }
 
-        final InputStream ris = PGMLoader.class.getResourceAsStream("/version");
+        final InputStream ris = getClass().getResourceAsStream("/version");
         if (ris == null) {
             throw new PGMLoaderException("Failed to fetch build version from resource file");
         }
 
-        try (final InputStream is = new BufferedInputStream(ris)) {
+        try (InputStream is = new BufferedInputStream(ris)) {
             pgmBuildVersion.set(new String(is.readAllBytes(), UTF_8));
         } catch (IOException e) {
             throw new PGMLoaderException("Failed to fetch build version from resource file", e);
@@ -119,13 +119,13 @@ public class PGMLoader {
 
     private String determineLibraryResourcePath(Platform platform) {
 
-        String archPart = switch (platform.architecture()) {
+        final String archPart = switch (platform.architecture()) {
             case ARM64 -> "arm64";
             case X86_64 -> "x86_64";
             default -> throw new PGMLoaderException("Unsupported CPU architecture");
         };
 
-        String osPart = switch (platform.operatingSystem()) {
+        final String osPart = switch (platform.operatingSystem()) {
             case MACOS -> "macosx.dylib";
             case LINUX -> "linux.so";
             case WINDOWS -> "windows.dll";
@@ -142,6 +142,8 @@ public class PGMLoader {
     /**
      * Interface that allows for mocking in unit tests.
      */
+    @SuppressWarnings({"checkstyle:MethodName", "PMD.MethodNamingConventions"})
+    @FunctionalInterface
     interface PGMInvoker {
         MemorySegment PGM_version();
     }
