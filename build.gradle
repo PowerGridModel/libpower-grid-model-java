@@ -17,6 +17,36 @@ repositories {
     mavenCentral()
 }
 
+apply plugin: 'checkstyle'
+apply plugin: 'pmd'
+
+checkstyle {
+    toolVersion = "13.5.0"
+    sourceSets = [project.sourceSets.main]
+}
+
+checkstyleMain {
+    configFile = "${rootDir}/config/checkstyle/checkstyle_main.xml" as File
+}
+
+checkstyleTest {
+    configFile = "${rootDir}/config/checkstyle/checkstyle_test.xml" as File
+}
+
+pmd {
+    consoleOutput = true
+    toolVersion = '7.26.0'
+    ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
+}
+
+pmdTest {
+    enabled = false
+}
+
+tasks.named("pmdMain", Pmd) {
+    source = fileTree("src/main/java")
+}
+
 def pgmVersion = "1.13.109"
 
 def pgmDir = layout.buildDirectory.dir("pgm").get()
@@ -57,7 +87,6 @@ def architectures = [
         nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_linux.so")
     ]
 ]
-
 
 tasks.register("extractPGMNativeLibsFromWheels") {
     doLast {
@@ -148,7 +177,6 @@ tasks.register("extractPGMHeaderFiles", Copy) {
     includeEmptyDirs false
     into headersDir
 }
-
 
 def jextractDir = layout.buildDirectory.dir("jextract").get()
 def jextractArchive = jextractDir.file("jextract.tar.gz")
@@ -288,13 +316,6 @@ dependencies {
     testImplementation platform('org.mockito:mockito-bom:5.23.0')
     testRuntimeOnly 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
-
-//
-//    compileOnly 'org.projectlombok:lombok:1.18.46'
-//    annotationProcessor 'org.projectlombok:lombok:1.18.46'
-//
-//    testCompileOnly 'org.projectlombok:lombok:1.18.46'
-//    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
 }
 
 test {

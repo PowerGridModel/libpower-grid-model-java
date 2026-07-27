@@ -7,7 +7,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import org.lfenergy.pgm.PowerGridModelC;
 
 final class ResourceLibraryLoader {
 
@@ -24,18 +23,18 @@ final class ResourceLibraryLoader {
 
                 @Override
                 public URL openResource(String path) {
-                    return PowerGridModelC.class.getClassLoader().getResource(path);
+                    return Thread.currentThread().getContextClassLoader().getResource(path);
                 }
 
                 @Override
-                public boolean resourceIsFile(URL resourceUrl) {
-                    return "file".equals(resourceUrl.getProtocol());
+                public boolean resourceIsFile(URL resourceURL) {
+                    return "file".equals(resourceURL.getProtocol());
                 }
 
                 @Override
                 public Path copyIntoTemporaryFile(final InputStream from, final String prefix, final String suffix) throws IOException {
 
-                    Path tempFile = Files.createTempFile(prefix, suffix);
+                    final Path tempFile = Files.createTempFile(prefix, suffix);
                     tempFile.toFile().deleteOnExit();
 
                     Files.copy(from, tempFile, StandardCopyOption.REPLACE_EXISTING);
@@ -64,7 +63,7 @@ final class ResourceLibraryLoader {
      */
     void loadResourceLibrary(final String resourceLibraryPath) {
 
-        Path libraryPath = provideLoadableLibraryFromResources(resourceLibraryPath);
+        final Path libraryPath = provideLoadableLibraryFromResources(resourceLibraryPath);
         dependencies.loadNativeLibrary(libraryPath.toString());
     }
 
@@ -79,9 +78,10 @@ final class ResourceLibraryLoader {
      * @throws PGMLoaderException if the resource file containing the native library cannot be found or opened, or if something unexpected happens
      *                            when copying the native library to a temporary file.
      */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private Path provideLoadableLibraryFromResources(final String resourceLibraryPath) {
 
-        URL resourceUrl = dependencies.openResource(resourceLibraryPath);
+        final URL resourceUrl = dependencies.openResource(resourceLibraryPath);
         if (resourceUrl == null) {
             throw new PGMLoaderException("Failed to find packaged native library");
         }
@@ -111,6 +111,6 @@ final class ResourceLibraryLoader {
         void loadNativeLibrary(String path);
         URL openResource(String path);
         boolean resourceIsFile(URL resourceUrl);
-        Path copyIntoTemporaryFile(InputStream from, final String prefix, final String suffix) throws IOException;
+        Path copyIntoTemporaryFile(InputStream from, String prefix, String suffix) throws IOException;
     }
 }

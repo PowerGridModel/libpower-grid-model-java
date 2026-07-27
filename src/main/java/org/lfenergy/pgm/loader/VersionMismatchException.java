@@ -1,6 +1,11 @@
 package org.lfenergy.pgm.loader;
 
+import java.io.Serial;
+
 public class VersionMismatchException extends PGMLoaderException {
+
+    @Serial
+    private static final long serialVersionUID = 4716888612549282053L;
 
     private final String runtimeVersion;
     private final String buildVersion;
