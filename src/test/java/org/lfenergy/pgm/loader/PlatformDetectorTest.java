@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
 package org.lfenergy.pgm.loader;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +28,9 @@ class PlatformDetectorTest {
 
     @MethodSource("testProvider")
     @ParameterizedTest
-    void test(String osName, String osArch, Platform expectedPlatform) {
+    void test(String osName,
+        String osArch,
+        Platform expectedPlatform) {
 
         when(systemPropertyProvider.getOsName()).thenReturn(osName);
         when(systemPropertyProvider.getOsArch()).thenReturn(osArch);
@@ -35,6 +40,7 @@ class PlatformDetectorTest {
         assertEquals(expectedPlatform, actualPlatform);
     }
 
+    // spotless:off
     static Stream<Arguments> testProvider() {
 
         return Stream.of(
@@ -76,4 +82,5 @@ class PlatformDetectorTest {
             )
         );
     }
+    // spotless:on
 }

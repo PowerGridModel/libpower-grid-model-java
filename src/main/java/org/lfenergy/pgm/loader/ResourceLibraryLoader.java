@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
 package org.lfenergy.pgm.loader;
 
 import java.io.BufferedInputStream;
@@ -13,26 +16,32 @@ final class ResourceLibraryLoader {
     private final Dependencies dependencies;
 
     ResourceLibraryLoader() {
+
         this(
             new Dependencies() {
 
                 @Override
                 public void loadNativeLibrary(final String nativeLibraryPath) {
+
                     System.load(nativeLibraryPath);
                 }
 
                 @Override
                 public URL openResource(String path) {
+
                     return Thread.currentThread().getContextClassLoader().getResource(path);
                 }
 
                 @Override
                 public boolean resourceIsFile(URL resourceURL) {
+
                     return "file".equals(resourceURL.getProtocol());
                 }
 
                 @Override
-                public Path copyIntoTemporaryFile(final InputStream from, final String prefix, final String suffix) throws IOException {
+                public Path copyIntoTemporaryFile(final InputStream from,
+                    final String prefix,
+                    final String suffix) throws IOException {
 
                     final Path tempFile = Files.createTempFile(prefix, suffix);
                     tempFile.toFile().deleteOnExit();
@@ -48,6 +57,7 @@ final class ResourceLibraryLoader {
     ResourceLibraryLoader(
         final Dependencies dependencies
     ) {
+
         this.dependencies = dependencies;
     }
 
@@ -94,9 +104,7 @@ final class ResourceLibraryLoader {
 
             try (InputStream in = new BufferedInputStream(resourceUrl.openStream())) {
                 return dependencies.copyIntoTemporaryFile(
-                    in,
-                    "pgm-native-",
-                    resourceLibraryPath.replace('.', '-')
+                    in, "pgm-native-", resourceLibraryPath.replace('.', '-')
                 );
             }
         } catch (Exception e) {
@@ -108,9 +116,15 @@ final class ResourceLibraryLoader {
      * Interface that allows for mocking in unit tests.
      */
     interface Dependencies {
+
         void loadNativeLibrary(String path);
+
         URL openResource(String path);
+
         boolean resourceIsFile(URL resourceUrl);
-        Path copyIntoTemporaryFile(InputStream from, String prefix, String suffix) throws IOException;
+
+        Path copyIntoTemporaryFile(InputStream from,
+            String prefix,
+            String suffix) throws IOException;
     }
 }

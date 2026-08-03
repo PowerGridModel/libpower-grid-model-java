@@ -3,6 +3,7 @@ import javax.inject.Inject
 plugins {
     id 'java'
     id 'maven-publish'
+    id("com.diffplug.spotless") version "8.9.0"
 }
 
 interface InjectedExecOps {
@@ -45,6 +46,19 @@ pmdTest {
 
 tasks.named("pmdMain", Pmd) {
     source = fileTree("src/main/java")
+}
+
+spotless{
+    java {
+        targetExclude("build/**")
+        toggleOffOn()
+        eclipse().configFile('config/spotless/code_style.xml')
+
+        licenseHeader """// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
+"""
+    }
 }
 
 def pgmVersion = "1.13.109"

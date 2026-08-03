@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
 // SPDX-License-Identifier: MPL-2.0
 
-package com.alliander.ads.dgsa.pgm;
+package org.lfenergy.pgm.example;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -18,14 +18,16 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * <p>
  * NOTE: The generated PowerGridModelC_1 class hardcodes the .so path at generation time. If the library has moved, re-run jextract or update SYMBOL_LOOKUP manually.
  */
-@SuppressWarnings({"PMD.SystemPrintln", })
+@SuppressWarnings("PMD.SystemPrintln")
 public final class PowerGridModelExample {
 
     private PowerGridModelExample() {
+
         // Prevent initialization
     }
 
     static void main() {
+
         final PGMLoader loader = new PGMLoader();
 
         loader.autoload();
@@ -44,6 +46,7 @@ public final class PowerGridModelExample {
         "PMD.CognitiveComplexity",
         "PMD.VariableDeclarationUsageDistance"})
     private static void runExample() {
+
         final MemorySegment handle = PowerGridModelC.PGM_create_handle();
 
         MemorySegment nodeInput = MemorySegment.NULL;
@@ -274,22 +277,26 @@ public final class PowerGridModelExample {
     }
 
     private static void ensureNoError(MemorySegment handle) {
+
         final long errorCode = PowerGridModelC.PGM_error_code(handle);
         if (errorCode != PowerGridModelC.PGM_no_error()) {
             throw new IllegalStateException(
-                    "PGM error " + errorCode + ": " + cString(PowerGridModelC.PGM_error_message(handle))
+                "PGM error " + errorCode + ": " + cString(PowerGridModelC.PGM_error_message(handle))
             );
         }
     }
 
     private static String cString(MemorySegment cStringPtr) {
+
         if (cStringPtr.equals(MemorySegment.NULL)) {
             return "<null>";
         }
         return cStringPtr.getString(0, UTF_8);
     }
 
-    private static MemorySegment toNativeIntArray(Arena arena, int... values) {
+    private static MemorySegment toNativeIntArray(Arena arena,
+        int... values) {
+
         final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_INT.byteSize(), PowerGridModelC.C_INT.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_INT, i, values[i]);
@@ -297,7 +304,9 @@ public final class PowerGridModelExample {
         return segment;
     }
 
-    private static MemorySegment toNativeDoubleArray(Arena arena, double... values) {
+    private static MemorySegment toNativeDoubleArray(Arena arena,
+        double... values) {
+
         final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_DOUBLE.byteSize(), PowerGridModelC.C_DOUBLE.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_DOUBLE, i, values[i]);
@@ -305,11 +314,13 @@ public final class PowerGridModelExample {
         return segment;
     }
 
-    private static MemorySegment toNativeLongArray(Arena arena, long... values) {
+    private static MemorySegment toNativeLongArray(Arena arena,
+        long... values) {
+
         final MemorySegment segment = arena.allocate(values.length * PowerGridModelC.C_LONG_LONG.byteSize(), PowerGridModelC.C_LONG_LONG.byteAlignment());
         for (int i = 0; i < values.length; i++) {
             segment.setAtIndex(PowerGridModelC.C_LONG_LONG, i, values[i]);
         }
         return segment;
     }
- }
+}

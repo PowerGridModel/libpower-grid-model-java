@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
 package org.lfenergy.pgm.loader;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +43,7 @@ public class ResourceLibraryLoaderTest {
     @ParameterizedTest
     @MethodSource("testProvider")
     void resourceFileExists(String resourceLibraryPath) {
+
         assertNotNull(PowerGridModelC.class.getResource(resourceLibraryPath));
     }
 
@@ -50,6 +54,7 @@ public class ResourceLibraryLoaderTest {
     @ParameterizedTest
     @MethodSource("testProvider")
     void testWhenResourceIsFile(String resourceLibraryPath) throws Exception {
+
         final URL resourceURL = PowerGridModelC.class.getResource(resourceLibraryPath);
 
         when(dependencies.openResource(resourceLibraryPath))
@@ -75,6 +80,7 @@ public class ResourceLibraryLoaderTest {
     @ParameterizedTest
     @MethodSource("testProvider")
     void testWhenResourceIsNotFile(String resourceLibraryPath) throws Exception {
+
         final String expectedPathString = "/foo/bar";
         final Path expectedPath = Path.of(expectedPathString);
         final URL resourceURL = PowerGridModelC.class.getResource(resourceLibraryPath);
@@ -97,7 +103,9 @@ public class ResourceLibraryLoaderTest {
         assertEquals(expectedPathString, systemLoadCaptor.getValue());
     }
 
+    // spotless:off
     static Stream<Arguments> testProvider() {
+
         return Stream.of(
             Arguments.argumentSet("LINUX, ARM64", "/power_grid_model_c_arm64_linux.so"),
             Arguments.argumentSet("LINUX, X86_64", "/power_grid_model_c_x86_64_linux.so"),
@@ -106,5 +114,5 @@ public class ResourceLibraryLoaderTest {
             Arguments.argumentSet("WINDOWS, X86_64", "/power_grid_model_c_x86_64_windows.dll")
         );
     }
-
+    // spotless:on
 }
