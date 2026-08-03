@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
 package org.lfenergy.pgm.loader;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -53,6 +56,7 @@ public class PGMLoaderTest {
 
     @BeforeAll
     static void beforeAll() {
+
         final InputStream ris = PGMLoader.class.getResourceAsStream("/version");
 
         try (InputStream is = new BufferedInputStream(ris)) {
@@ -65,7 +69,9 @@ public class PGMLoaderTest {
 
     @MethodSource("testAutoloadProvider")
     @ParameterizedTest
-    void testAutoload(Platform platform, String expectedResourceFile) {
+    void testAutoload(Platform platform,
+        String expectedResourceFile) {
+
         // Stub the static method
         when(pgmInvoker.PGM_version())
             .thenReturn(pgmBuildVersionPointer);
@@ -83,6 +89,7 @@ public class PGMLoaderTest {
         assertEquals(expectedResourceFile, resourceLibraryLoaderCaptor.getValue());
     }
 
+    // spotless:off
     static Stream<Arguments> testAutoloadProvider() {
 
         return Stream.of(
@@ -90,29 +97,26 @@ public class PGMLoaderTest {
                 "MACOS, ARM64",
                 new Platform(MACOS, ARM64),
                 "power_grid_model_c_arm64_macosx.dylib"
-            ),
-            argumentSet(
+            ), argumentSet(
                 "MACOS, X86_64",
                 new Platform(MACOS, X86_64),
                 "power_grid_model_c_x86_64_macosx.dylib"
-            ),
-            argumentSet(
+            ), argumentSet(
                 "LINUX, ARM64",
                 new Platform(LINUX, ARM64),
                 "power_grid_model_c_arm64_linux.so"
-            ),
-            argumentSet(
+            ), argumentSet(
                 "LINUX, X86_64",
                 new Platform(LINUX, X86_64),
                 "power_grid_model_c_x86_64_linux.so"
-            ),
-            argumentSet(
+            ), argumentSet(
                 "WINDOWS, X86_64",
                 new Platform(WINDOWS, X86_64),
                 "power_grid_model_c_x86_64_windows.dll"
             )
         );
     }
+    // spotless:on
 
     @Test
     void testCheckThrowsVersionMismatchExceptionWhenCheckingVersionAndVersionsNotEqual() {
@@ -145,6 +149,7 @@ public class PGMLoaderTest {
     }
 
     private static MemorySegment createNullTerminatedString(String string) {
+
         ByteBuffer buffer = UTF_8.encode(string);
         byte[] bytes = new byte[buffer.remaining() + 1];
         buffer.get(bytes, 0, buffer.remaining());

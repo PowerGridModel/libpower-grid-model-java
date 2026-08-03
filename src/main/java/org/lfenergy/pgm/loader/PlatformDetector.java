@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
 package org.lfenergy.pgm.loader;
 
 class PlatformDetector {
@@ -5,7 +8,9 @@ class PlatformDetector {
     private final SystemPropertyProvider systemPropertyProvider;
 
     PlatformDetector() {
+
         this(new SystemPropertyProvider() {
+
             @Override
             public String getOsArch() {
 
@@ -21,6 +26,7 @@ class PlatformDetector {
     }
 
     PlatformDetector(SystemPropertyProvider systemPropertyProvider) {
+
         this.systemPropertyProvider = systemPropertyProvider;
     }
 
@@ -44,6 +50,7 @@ class PlatformDetector {
     }
 
     private OperatingSystem detectOperatingSystem(final String osName) {
+
         final String normalized = osName == null ? "" : osName.toLowerCase();
 
         if (normalized.contains("mac")) {
@@ -62,7 +69,9 @@ class PlatformDetector {
      * Interface that allows for mocking in unit tests.
      */
     interface SystemPropertyProvider {
+
         String getOsArch();
+
         String getOsName();
     }
 }
