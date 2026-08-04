@@ -16,7 +16,7 @@ public class VersionMismatchException extends PGMLoaderException {
     public VersionMismatchException(String runtimeVersion,
         String buildVersion) {
 
-        super(String.format("jpgm was built for version %s, but version %s is present at runtime", buildVersion, runtimeVersion));
+        super(String.format("libpower-grid-model-java was built for version %s, but version %s is present at runtime", buildVersion, runtimeVersion));
         this.runtimeVersion = runtimeVersion;
         this.buildVersion = buildVersion;
     }
