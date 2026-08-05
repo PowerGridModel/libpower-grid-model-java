@@ -14,25 +14,25 @@ The PGM methods are available through class `org.lfenergy.pgm.PowerGridModelC`. 
 
 To load the native library there are two options:
 - on supported architectures, the library can be autoloaded using `PGMLoader.autoload()`
-- on other architecture, you can build and load the library yourself using `System.load(...)`, and verify if you've loaded it correctly using `PGMLoader.verifyLoaded()`.
+- on other architecture, you can build and load the library yourself using `System.load(...)`, and verify if you've loaded it correctly using `PGMLoader.check()`.
 
 ## Supported architectures
 
-- Mac OS ARM64 (Apple with M1 chip and newer)
-- Mac OS x86-64 (Apple with Intel chips)
-- Linux ARM64 (e.g. Snapdragon CPU)
-- Linux x86-64 (Intel, AMD, etc.)
-- Windows x86-64 (Intel, AMD, etc.)
+- macOS ARM64
+- macOS x86-64
+- Linux ARM64
+- Linux x86-64
+- Windows x86-64
 
 
 ## Checklist after creating a repository from this template
 
 Update the following items manually before publishing your repository:
 
-- [ ] Rename the repository and update all references in this file.
-- [ ] Replace all `pgm-template-repo` references across the repository, especially in this README and REUSE.toml.
-- [ ] Replace the project title and description in this README.
-- [ ] Ensure all third-party licenses are present in [LICENSES](https://github.com/PowerGridModel/pgm-template-repo/tree/main/LICENSES).
+- [x] Rename the repository and update all references in this file.
+- [x] Replace all `pgm-template-repo` references across the repository, especially in this README and REUSE.toml.
+- [x] Replace the project title and description in this README.
+- [ ] Ensure all third-party licenses are present in [LICENSES](https://github.com/PowerGridModel/libpower-grid-model-java/tree/main/LICENSES).
 
 ### Optional checks
 
@@ -41,14 +41,14 @@ Change these if applicable.
 - [ ] Replace Power Grid Model project-specific links (for example contributing, support, release, security, and code of conduct links) 
 with links for your project.
 - [ ] Add logos and badges corresponding to relevant pages
-- [ ] Verify [LICENSE](https://github.com/PowerGridModel/pgm-template-repo/blob/main/LICENSE) copyright holder and year(s).
+- [ ] Verify [LICENSE](https://github.com/PowerGridModel/libpower-grid-model-java/blob/main/LICENSE) copyright holder and year(s).
 Also verify SPDX copyright headers in source and documentation files.
 - [ ] Include documents present in [Home page of PGM org](https://github.com/PowerGridModel/.github/) in documentation if they are created.
 
 ## License
 
 This project is licensed under the Mozilla Public License, version 2.0 - see
-[LICENSE](https://github.com/PowerGridModel/pgm-template-repo/blob/main/LICENSE) for details.
+[LICENSE](https://github.com/PowerGridModel/libpower-grid-model-java/blob/main/LICENSE) for details.
 
 ## Licenses third-party libraries
 
@@ -56,7 +56,7 @@ This project includes third-party libraries,
 which are licensed under their own respective Open-Source licenses.
 SPDX-License-Identifier headers are used to show which license is applicable.
 The concerning license files can be found in the
-[LICENSES](https://github.com/PowerGridModel/pgm-template-repo/tree/main/LICENSES) directory.
+[LICENSES](https://github.com/PowerGridModel/libpower-grid-model-java/tree/main/LICENSES) directory.
 
 ## Contributing
 
