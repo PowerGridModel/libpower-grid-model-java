@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: MPL-2.0
 
 version = 1
-SPDX-PackageName = "pgm-template-repo"
+SPDX-PackageName = "libpower-grid-model-java"
 SPDX-PackageSupplier = "Power Grid Model project <powergridmodel@lfenergy.org>"
-SPDX-PackageDownloadLocation = "https://github.com/PowerGridModel/pgm-template-repo"
+SPDX-PackageDownloadLocation = "https://github.com/PowerGridModel/libpower-grid-model-java"
 
 [[annotations]]
 path = "./**"
