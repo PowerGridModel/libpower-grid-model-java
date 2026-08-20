@@ -18,7 +18,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * <p>
  * NOTE: The generated PowerGridModelC_1 class hardcodes the .so path at generation time. If the library has moved, re-run jextract or update SYMBOL_LOOKUP manually.
  */
-@SuppressWarnings("PMD.SystemPrintln")
 public final class PowerGridModelExample {
 
     private PowerGridModelExample() {
@@ -41,10 +40,6 @@ public final class PowerGridModelExample {
 
     // -------------------------------------------------------------------------
 
-    @SuppressWarnings({"checkstyle:MagicNumber", "checkstyle:MethodLength",
-        "PMD.NcssCount",
-        "PMD.CognitiveComplexity",
-        "PMD.VariableDeclarationUsageDistance"})
     private static void runExample() {
 
         final MemorySegment handle = PowerGridModelC.PGM_create_handle();

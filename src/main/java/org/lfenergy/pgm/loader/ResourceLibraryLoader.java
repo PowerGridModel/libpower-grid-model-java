@@ -88,7 +88,6 @@ final class ResourceLibraryLoader {
      * @throws PGMLoaderException if the resource file containing the native library cannot be found or opened, or if something unexpected happens
      *                            when copying the native library to a temporary file.
      */
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private Path provideLoadableLibraryFromResources(final String resourceLibraryPath) {
 
         final URL resourceUrl = dependencies.openResource(resourceLibraryPath);
