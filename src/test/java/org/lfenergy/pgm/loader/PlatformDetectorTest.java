@@ -40,7 +40,6 @@ class PlatformDetectorTest {
         assertEquals(expectedPlatform, actualPlatform);
     }
 
-    // spotless:off
     static Stream<Arguments> testProvider() {
 
         return Stream.of(
@@ -82,5 +81,4 @@ class PlatformDetectorTest {
             )
         );
     }
-    // spotless:on
 }
