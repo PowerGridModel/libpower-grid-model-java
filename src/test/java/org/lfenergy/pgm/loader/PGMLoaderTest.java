@@ -89,7 +89,6 @@ public class PGMLoaderTest {
         assertEquals(expectedResourceFile, resourceLibraryLoaderCaptor.getValue());
     }
 
-    // spotless:off
     static Stream<Arguments> testAutoloadProvider() {
 
         return Stream.of(
@@ -116,7 +115,6 @@ public class PGMLoaderTest {
             )
         );
     }
-    // spotless:on
 
     @Test
     void testCheckThrowsVersionMismatchExceptionWhenCheckingVersionAndVersionsNotEqual() {

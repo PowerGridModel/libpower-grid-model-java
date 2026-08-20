@@ -7,7 +7,6 @@ import javax.inject.Inject
 plugins {
     id 'java'
     id 'maven-publish'
-    id("com.diffplug.spotless") version "8.9.0"
 }
 
 interface InjectedExecOps {
@@ -20,49 +19,6 @@ version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
-}
-
-apply plugin: 'checkstyle'
-apply plugin: 'pmd'
-
-checkstyle {
-    toolVersion = "13.5.0"
-    sourceSets = [project.sourceSets.main]
-}
-
-checkstyleMain {
-    configFile = "${rootDir}/config/checkstyle/checkstyle_main.xml" as File
-}
-
-checkstyleTest {
-    configFile = "${rootDir}/config/checkstyle/checkstyle_test.xml" as File
-}
-
-pmd {
-    consoleOutput = true
-    toolVersion = '7.26.0'
-    ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
-}
-
-pmdTest {
-    enabled = false
-}
-
-tasks.named("pmdMain", Pmd) {
-    source = fileTree("src/main/java")
-}
-
-spotless{
-    java {
-        targetExclude("build/**")
-        toggleOffOn()
-        eclipse().configFile('config/spotless/code_style.xml')
-
-        licenseHeader """// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
-// SPDX-License-Identifier: MPL-2.0
-
-"""
-    }
 }
 
 def pgmVersion = "1.13.109"

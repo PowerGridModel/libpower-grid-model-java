@@ -103,7 +103,6 @@ public class ResourceLibraryLoaderTest {
         assertEquals(expectedPathString, systemLoadCaptor.getValue());
     }
 
-    // spotless:off
     static Stream<Arguments> testProvider() {
 
         return Stream.of(
@@ -114,5 +113,4 @@ public class ResourceLibraryLoaderTest {
             Arguments.argumentSet("WINDOWS, X86_64", "/power_grid_model_c_x86_64_windows.dll")
         );
     }
-    // spotless:on
 }

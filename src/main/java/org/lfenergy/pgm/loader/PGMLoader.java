@@ -89,7 +89,6 @@ public class PGMLoader {
         }
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public String getPGMRuntimeVersion() {
 
         if (pgmRuntimeVersion.get() != null) {
@@ -150,7 +149,6 @@ public class PGMLoader {
     /**
      * Interface that allows for mocking in unit tests.
      */
-    @SuppressWarnings({"checkstyle:MethodName", "PMD.MethodNamingConventions"})
     @FunctionalInterface
     interface PGMInvoker {
 
