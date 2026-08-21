@@ -76,3 +76,7 @@ jobs:
         shell: bash
         run: |
           echo "name=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
+
+  reuse-compliance:
+    name: REUSE Compliance
+    uses: ./.github/workflows/reuse-compliance.yml
