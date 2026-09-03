@@ -7,17 +7,6 @@ name: Java CI with Gradle for library
 on:
   push:
   workflow_dispatch:
-    inputs:
-      local_image_tag:
-        description: Local image tag used before push
-        required: false
-        type: string
-        default: application:0.0.1-SNAPSHOT
-      deploy_branch:
-        description: Branch required to push image
-        required: false
-        type: string
-        default: main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,18 +16,10 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write # Needed to load credentials
-      contents: read # Needed to read repository (content)
     outputs:
       build_tag: ${{ steps.create_tag.outputs.build_tag }}
     environment:
       name: ci
-    env:
-      LOCAL_IMAGE_TAG: ${{ inputs.local_image_tag }}
-      DEPLOY_BRANCH: ${{ inputs.deploy_branch }}
-      IMAGE_REPOSITORY_PREFIX: ${{ inputs.image_repository_prefix }}${{ inputs.namespace }}
-      IS_TAG: ${{ github.ref_type == 'tag' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
@@ -66,16 +47,6 @@ jobs:
 
       - name: Build & Run Tests
         run: ./gradlew build --configuration-cache
-
-      - name: Create Build Tag
-        id: create_tag
-        uses: ./.github/actions/create-build-tag
-
-      - name: Repository Name
-        id: repo
-        shell: bash
-        run: |
-          echo "name=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
 
   reuse-compliance:
     name: REUSE Compliance
