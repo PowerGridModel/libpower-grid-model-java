@@ -2,11 +2,15 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+
+import org.jreleaser.model.Active
+
 import javax.inject.Inject
 
 plugins {
     id 'java'
     id 'maven-publish'
+    id 'org.jreleaser' version '1.26.0'
 }
 
 interface InjectedExecOps {
@@ -268,6 +272,20 @@ sourceSets {
     }
 }
 
+tasks.register('sourcesJar', Jar) {
+    dependsOn(tasks.named('generatePGMBindings'))
+    from sourceSets.main.java
+    archiveClassifier.set('sources')
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+java {
+    withJavadocJar()
+}
+
 tasks.named('compileJava') {
     dependsOn(tasks.named('generatePGMBindings'))
 }
@@ -280,7 +298,60 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
+            groupId = 'org.lfenergy.pgm'
             artifactId = 'lib-power-grid-model'
+
+            pom {
+                name = 'lib-power-grid-model'
+                description = ''
+                url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
+                organization {
+                    name = 'LF Energy'
+                    url = 'https://lfenergy.org'
+                }
+                licenses {
+                    license {
+                        name = 'Mozilla Public License, Version 2.0"'
+                        url = 'https://www.mozilla.org/en-US/MPL/2.0/'
+                    }
+                }
+                developers {
+                    developer {
+                        email = 'powergridmodel@lfenergy.org'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
+                    connection = 'scm:git:git://github.com/PowerGridModel/libpower-grid-model-java.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/PowerGridModel/libpower-grid-model-java.git'
+                }
+            }
+
+        }
+    }
+}
+
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+    }
+    deploy {
+        maven {
+//            mavenCentral {
+//                'release-deploy' {
+//                    active = 'RELEASE'
+//                    url = 'https://central.sonatype.com/api/v1/publisher'
+//                }
+//            }
+            nexus2 {
+                'snapshot-deploy' {
+                    active = 'SNAPSHOT'
+                    snapshotUrl = 'https://central.sonatype.com/repository/maven-snapshots/'
+                    applyMavenCentralRules = true
+                    snapshotSupported = true
+                }
+            }
         }
     }
 }
