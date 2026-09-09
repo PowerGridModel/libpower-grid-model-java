@@ -2,9 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-
-import org.jreleaser.model.Active
-
 import javax.inject.Inject
 
 plugins {
@@ -303,11 +300,11 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            groupId = 'io.github.wei-qiang'
-            artifactId = 'lib-power-grid-model'
+            groupId = 'org.lfenergy.powergridmodel'
+            artifactId = 'power-grid-model-ffm'
 
             pom {
-                name = 'lib-power-grid-model'
+                name = 'power-grid-model-ffm'
                 description = 'Java package which wraps PGM core shared library'
                 url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
                 organization {
@@ -346,12 +343,12 @@ jreleaser {
     }
     deploy {
         maven {
-//            mavenCentral {
-//                'release-deploy' {
-//                    active = 'RELEASE'
-//                    url = 'https://central.sonatype.com/api/v1/publisher'
-//                }
-//            }
+            mavenCentral {
+                'release-deploy' {
+                    active = 'RELEASE'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                }
+            }
             nexus2 {
                 'snapshot-deploy' {
                     active = 'SNAPSHOT'
