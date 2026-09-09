@@ -308,7 +308,7 @@ publishing {
 
             pom {
                 name = 'lib-power-grid-model'
-                description = ''
+                description = 'Java package which wraps PGM core shared library'
                 url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
                 organization {
                     name = 'LF Energy'
