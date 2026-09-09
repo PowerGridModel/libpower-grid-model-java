@@ -298,7 +298,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            groupId = 'org.lfenergy.pgm'
+            groupId = 'io.github.wei-qiang'
             artifactId = 'lib-power-grid-model'
 
             pom {
