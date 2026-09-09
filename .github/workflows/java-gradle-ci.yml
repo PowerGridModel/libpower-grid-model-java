@@ -55,7 +55,7 @@ jobs:
   push-and-deploy:
     name: Push Deployment Updates
     needs: [build-and-test]
-    if: always() && github.ref_type == 'tag'
+#    if: always() && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -100,4 +100,4 @@ jobs:
           echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
           
           ./gradlew clean build \
-          jreleaserDeploy --dryrun -jreleaser.project.version=$SANITIZED_TAG
+          jreleaserDeploy --dryrun -jreleaser.project.version=0.1-SNAPSHOT
