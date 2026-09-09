@@ -295,6 +295,11 @@ tasks.named('processResources') {
 }
 
 publishing {
+    repositories {
+        maven {
+            url = layout.buildDirectory.dir("staging-deploy")
+        }
+    }
     publications {
         mavenJava(MavenPublication) {
             from components.java
@@ -350,7 +355,7 @@ jreleaser {
                     snapshotUrl = 'https://central.sonatype.com/repository/maven-snapshots/'
                     applyMavenCentralRules = true
                     snapshotSupported = true
-                    stagingRepository('build/libs')
+                    stagingRepository('target/staging-deploy')
                 }
             }
         }
