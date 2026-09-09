@@ -100,4 +100,4 @@ jobs:
           echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
           
           ./gradlew clean build publish \
-          jreleaserDeploy --dryrun -Pversion=0.1-SNAPSHOT
+          jreleaserDeploy --dryrun -Pversion=0.1-SNAPSHOT --debug
