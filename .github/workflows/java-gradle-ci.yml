@@ -52,8 +52,8 @@ jobs:
     name: REUSE Compliance
     uses: ./.github/workflows/reuse-compliance.yml
 
-  push-and-deploy:
-    name: Push Deployment Updates
+  publish:
+    name: Publish to maven central
     needs: [build-and-test]
 #    if: always() && github.ref_type == 'tag'
     runs-on: ubuntu-latest
@@ -100,4 +100,4 @@ jobs:
           echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
           
           ./gradlew clean build \
-          jreleaserDeploy --dryrun -jreleaser.project.version=0.1-SNAPSHOT
+          jreleaserDeploy --dryrun -Pjreleaser.project.version=0.1-SNAPSHOT
