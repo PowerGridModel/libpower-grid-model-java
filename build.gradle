@@ -322,7 +322,10 @@ publishing {
                 }
                 developers {
                     developer {
+                        id = 'contributors'
+                        name = 'Power Grid Model Contributors'
                         email = 'powergridmodel@lfenergy.org'
+                        url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
                     }
                 }
                 scm {
