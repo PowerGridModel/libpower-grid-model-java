@@ -99,6 +99,6 @@ jobs:
         run: |
           echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
           
-          ./gradlew clean build publish -Pproject.version=0.1-SNAPSHOT
+          ./gradlew clean build publish -Pjreleaser.project.version=0.1-SNAPSHOT
           find build/staging-deploy -type f
-          ./gradlew jreleaserDeploy --dryrun -Pproject.version=0.1-SNAPSHOT
+          ./gradlew jreleaserDeploy --dryrun -Pjreleaser.project.version=0.1-SNAPSHOT
