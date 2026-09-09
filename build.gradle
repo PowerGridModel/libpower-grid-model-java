@@ -271,17 +271,8 @@ sourceSets {
     }
 }
 
-tasks.register('sourcesJar', Jar) {
-    dependsOn(tasks.named('generatePGMBindings'))
-    from sourceSets.main.java
-    archiveClassifier.set('sources')
-}
-
-artifacts {
-    archives sourcesJar
-}
-
 java {
+    withSourcesJar()
     withJavadocJar()
 }
 
