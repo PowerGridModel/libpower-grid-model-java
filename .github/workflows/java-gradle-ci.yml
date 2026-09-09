@@ -100,5 +100,4 @@ jobs:
           echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
           
           ./gradlew clean build publish -Pversion=0.1-SNAPSHOT
-          find build/staging-deploy -type f
-          ./gradlew jreleaserDeploy --dryrun -Pversion=0.1-SNAPSHOT
+          ./gradlew jreleaserDeploy -Pversion=0.1-SNAPSHOT
