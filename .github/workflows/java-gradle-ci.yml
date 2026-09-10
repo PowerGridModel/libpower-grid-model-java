@@ -55,7 +55,7 @@ jobs:
   publish:
     name: Publish to maven central
     needs: [build-and-test]
-    if: always() && github.ref_type == 'tag'
+    if: github.event_name == 'release' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
