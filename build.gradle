@@ -350,15 +350,6 @@ jreleaser {
                     stagingRepository('build/staging-deploy')
                 }
             }
-            nexus2 {
-                'snapshot-deploy' {
-                    active = 'SNAPSHOT'
-                    snapshotUrl = 'https://central.sonatype.com/repository/maven-snapshots/'
-                    applyMavenCentralRules = true
-                    snapshotSupported = true
-                    stagingRepository('build/staging-deploy')
-                }
-            }
         }
     }
 }
