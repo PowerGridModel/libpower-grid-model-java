@@ -7,6 +7,12 @@ name: Java CI with Gradle for library
 on:
   push:
   workflow_dispatch:
+    inputs:
+      create_release:
+        type: boolean
+        description: Create a release when CI passes
+        default: false
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,3 +57,52 @@ jobs:
   reuse-compliance:
     name: REUSE Compliance
     uses: ./.github/workflows/reuse-compliance.yml
+
+  publish:
+    name: Publish to maven central
+    needs: [build-and-test]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup runtime
+        uses: ./.github/actions/setup-runtime
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/settings.gradle*') }}
+
+      - name: Optimize Gradle
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.caching=true" >> ~/.gradle/gradle.properties
+          echo "org.gradle.configuration-cache=true" >> ~/.gradle/gradle.properties
+
+      - name: Gradle Release Build
+        env:
+          JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
+          JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          SANITIZED_TAG: ${{ github.ref_name }}
+        run: |
+          echo "Performing release Gradle publish for tag: $SANITIZED_TAG"
+          
+          ./gradlew clean build publish -Pversion=$SANITIZED_TAG
+          ./gradlew jreleaserDeploy -Pversion=$SANITIZED_TAG

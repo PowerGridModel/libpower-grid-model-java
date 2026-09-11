@@ -7,6 +7,7 @@ import javax.inject.Inject
 plugins {
     id 'java'
     id 'maven-publish'
+    id 'org.jreleaser' version '1.26.0'
 }
 
 interface InjectedExecOps {
@@ -15,7 +16,6 @@ interface InjectedExecOps {
 }
 
 group = 'org-power-grid-model'
-version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -268,6 +268,21 @@ sourceSets {
     }
 }
 
+tasks.register('sourcesJar', Jar) {
+    dependsOn(tasks.named('generatePGMBindings'))
+    from sourceSets.main.java
+    archiveClassifier.set('sources')
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
 tasks.named('compileJava') {
     dependsOn(tasks.named('generatePGMBindings'))
 }
@@ -277,10 +292,64 @@ tasks.named('processResources') {
 }
 
 publishing {
+    repositories {
+        maven {
+            url = layout.buildDirectory.dir("staging-deploy")
+        }
+    }
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            artifactId = 'lib-power-grid-model'
+            groupId = 'org.lfenergy.powergridmodel'
+            artifactId = 'power-grid-model-ffm'
+
+            pom {
+                name = 'power-grid-model-ffm'
+                description = 'Java package which wraps PGM core shared library'
+                url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
+                organization {
+                    name = 'LF Energy'
+                    url = 'https://lfenergy.org'
+                }
+                licenses {
+                    license {
+                        name = 'Mozilla Public License, Version 2.0"'
+                        url = 'https://www.mozilla.org/en-US/MPL/2.0/'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'contributors'
+                        name = 'Power Grid Model Contributors'
+                        email = 'powergridmodel@lfenergy.org'
+                        url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/PowerGridModel/libpower-grid-model-java'
+                    connection = 'scm:git:git://github.com/PowerGridModel/libpower-grid-model-java.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/PowerGridModel/libpower-grid-model-java.git'
+                }
+            }
+
+        }
+    }
+}
+
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+    }
+    deploy {
+        maven {
+            mavenCentral {
+                'release-deploy' {
+                    active = 'RELEASE'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
         }
     }
 }
