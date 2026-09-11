@@ -61,7 +61,7 @@ jobs:
   publish:
     name: Publish to maven central
     needs: [build-and-test]
-    if: github.event_name == 'workflow_dispatch' && inputs.create_release && github.ref_type == 'tag'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     environment: release
     permissions:
