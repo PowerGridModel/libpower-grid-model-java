@@ -75,6 +75,7 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
           commit-message: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
           branch: ${{ steps.update-version.outputs.branch_name }}
+          signoff: true
           sign-commits: true
           delete-branch: true
           title: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
