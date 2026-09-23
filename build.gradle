@@ -21,7 +21,7 @@ repositories {
     mavenCentral()
 }
 
-def pgmVersion = "1.13.169"
+def pgmVersion = "1.13.172"
 
 def pgmDir = layout.buildDirectory.dir("pgm").get()
 def wheelDir = pgmDir.dir("download")
