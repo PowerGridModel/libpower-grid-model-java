@@ -27,8 +27,8 @@ jobs:
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: generate-token
         with:
-          client-id: ${{ secrets.RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          client-id: ${{ secrets.CI_BOT_APP_ID }}
+          private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}
           repositories: ${{ github.repository }}
           permission-contents: write
           permission-pull-requests: write
@@ -75,6 +75,7 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
           commit-message: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
           branch: ${{ steps.update-version.outputs.branch_name }}
+          signoff: true
           sign-commits: true
           delete-branch: true
           title: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
