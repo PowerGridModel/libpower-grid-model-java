@@ -1,0 +1,158 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+// SPDX-License-Identifier: MPL-2.0
+
+import javax.inject.Inject
+
+abstract class DownloadPgmFile extends DefaultTask {
+    @Internal
+    abstract Property<String> getDownloadUrl()
+
+    @OutputFile
+    abstract RegularFileProperty getDestination()
+
+    @TaskAction
+    void download() {
+        def target = destination.get().asFile
+        target.parentFile.mkdirs()
+        URI.create(downloadUrl.get()).toURL().withInputStream { input ->
+            target.withOutputStream { output -> output << input }
+        }
+    }
+}
+
+abstract class GenerateLegacyPgmBindings extends DefaultTask {
+    @Inject
+    abstract ExecOperations getExecOperations()
+
+    @Internal
+    abstract RegularFileProperty getLocalExecutable()
+
+    @Internal
+    abstract ConfigurableFileCollection getDownloadedExecutables()
+
+    @Internal
+    abstract Property<String> getExecutableName()
+
+    @InputFiles
+    abstract ConfigurableFileCollection getHeaders()
+
+    @OutputDirectory
+    abstract DirectoryProperty getGeneratedSources()
+
+    @TaskAction
+    void generate() {
+        def executable = localExecutable.orNull?.asFile
+        if (executable == null) {
+            def matches = downloadedExecutables.files.findAll { it.name == executableName.get() }
+            if (matches.size() != 1) {
+                throw new GradleException("Expected exactly one jextract executable, but found ${matches.size()}: $matches")
+            }
+            executable = matches.first()
+        }
+        execOperations.exec {
+            commandLine executable, '--output', generatedSources.get().asFile,
+                    '--target-package', 'org.lfenergy.pgm',
+                    '--header-class-name', 'PowerGridModelC', *headers.files.toList()
+        }
+    }
+}
+
+def version = providers.provider { project.ext.pgmWheelVersion }
+def pgmDir = layout.buildDirectory.dir('pgm').get()
+def wheels = pgmDir.dir('download')
+def headers = pgmDir.dir('headers')
+def nativeLibraries = pgmDir.dir('lib')
+def generatedSources = pgmDir.dir('generated-src')
+
+def platforms = [
+    x86_64_macosx : ['macosx_13_0_x86_64', 'lib/libpower_grid_model_c.dylib', 'dylib'],
+    arm64_macosx : ['macosx_13_0_arm64', 'lib/libpower_grid_model_c.dylib', 'dylib'],
+    x86_64_windows: ['win_amd64', 'bin/power_grid_model_c.dll', 'dll'],
+    arm64_linux  : ['manylinux_2_24_aarch64.manylinux_2_28_aarch64', 'lib64/libpower_grid_model_c.so', 'so'],
+    x86_64_linux : ['manylinux_2_26_x86_64.manylinux_2_28_x86_64', 'lib64/libpower_grid_model_c.so', 'so']
+]
+
+def allLibraries = tasks.register('extractPGMNativeLibsFromWheels') {
+    def wheelVersion = version.get()
+    doLast { nativeLibraries.file('version').asFile.write(wheelVersion) }
+}
+def wheelPrefix = 'power_grid_model/_core/power_grid_model_c'
+
+platforms.each { slug, platform ->
+    def (wheelTag, nativePath, extension) = platform
+    def wheel = wheels.file("power_grid_model_${slug}.whl")
+    def download = tasks.register("downloadPGMWheel_$slug", DownloadPgmFile) {
+        def wheelVersion = version.get()
+        downloadUrl.set("https://github.com/PowerGridModel/power-grid-model/releases/download/v${wheelVersion}/power_grid_model-${wheelVersion}-py3-none-${wheelTag}.whl")
+        destination.set(wheel)
+    }
+    def extract = tasks.register("extractPGMNativeLibFromWheel_$slug", Copy) {
+        dependsOn(download)
+        def filename = "power_grid_model_c_${slug}.${extension}"
+        outputs.file(nativeLibraries.file(filename))
+        from(zipTree(wheel)) {
+            include "$wheelPrefix/$nativePath"
+            eachFile { path = filename }
+        }
+        includeEmptyDirs = false
+        into(nativeLibraries)
+    }
+    allLibraries.configure { dependsOn(extract) }
+}
+
+def extractHeaders = tasks.register('extractPGMHeaderFiles', Copy) {
+    dependsOn(tasks.named('extractPGMNativeLibFromWheel_x86_64_linux'))
+    def includeRoot = "$wheelPrefix/include"
+    from(zipTree(wheels.file('power_grid_model_x86_64_linux.whl'))) {
+        include "$includeRoot/**/*.h"
+        eachFile { path = path.substring(includeRoot.length() + 1) }
+    }
+    includeEmptyDirs = false
+    into(headers)
+}
+
+def jextractDir = layout.buildDirectory.dir('jextract').get()
+def jextractArchive = jextractDir.file('jextract.tar.gz')
+def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+def arm = arch in ['aarch64', 'arm64']
+def toolPlatform
+if (os.contains('linux')) {
+    toolPlatform = arm ? 'linux_aarch64' : 'linux_x64'
+} else if (os.contains('mac')) {
+    toolPlatform = arm ? 'macos_aarch64' : 'macos_x64'
+} else if (os.contains('windows') && arch in ['amd64', 'x86_64']) {
+    toolPlatform = 'windows_x64'
+} else {
+    throw new GradleException("Unsupported platform: $os / $arch")
+}
+def jextractUrl = providers.gradleProperty("jextract_${toolPlatform}_url").get()
+def downloadJextract = tasks.register('downloadJextract', DownloadPgmFile) {
+    downloadUrl.set(jextractUrl)
+    destination.set(jextractArchive)
+}
+def extractJextract = tasks.register('extractJextract', Copy) {
+    dependsOn(downloadJextract)
+    from(tarTree(resources.gzip(jextractArchive.asFile)))
+    into(jextractDir)
+}
+def localJextract = providers.gradleProperty('jextract_bin').orNull
+def generate = tasks.register('generatePGMBindings', GenerateLegacyPgmBindings) {
+    if (localJextract != null) {
+        localExecutable.set(file(localJextract))
+    } else {
+        dependsOn(extractJextract)
+        downloadedExecutables.from(fileTree(jextractDir) { include '**/bin/*' })
+        executableName.set(os.contains('windows') ? 'jextract.exe' : 'jextract')
+    }
+    dependsOn(allLibraries, extractHeaders)
+    getHeaders().from(headers.file('power_grid_model_c.h'), headers.file('power_grid_model_c/dataset_definitions.h'))
+    getGeneratedSources().set(generatedSources)
+}
+
+plugins.withId('java') {
+    sourceSets.main.java.srcDir(generatedSources)
+    sourceSets.main.resources.srcDir(nativeLibraries)
+    tasks.named('compileJava') { dependsOn(generate) }
+    tasks.named('processResources') { dependsOn(generate) }
+}
