@@ -5,6 +5,7 @@ import javax.inject.Inject
 import pgm.BuildPgmExtractor
 import pgm.ExtractPgmDeclarations
 import pgm.EmitPgmBindings
+import pgm.BindingFingerprint
 
 abstract class DownloadPgmFile extends DefaultTask {
     @Input
@@ -197,6 +198,16 @@ def generateCandidate = tasks.register('generatePortablePGMBindings', EmitPgmBin
 }
 def generate = tasks.register('generatePGMBindings') {
     dependsOn(usePortable ? generateCandidate : generateLegacy)
+}
+def referencePath = providers.gradleProperty('pgmBindingReference').orNull
+tasks.register('fingerprintPGMBindings', BindingFingerprint) {
+    inventory.set(inspect.flatMap { it.inventory })
+    sourceDirectory.set(generateCandidate.flatMap { it.output })
+    wheelVersion.set(version.get())
+    destination.set(pgmDir.file('binding-fingerprint.json'))
+    if (referencePath != null) {
+        reference.set(layout.projectDirectory.file(referencePath))
+    }
 }
 
 plugins.withId('java') {
