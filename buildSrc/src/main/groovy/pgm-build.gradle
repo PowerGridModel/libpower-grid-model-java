@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
 // SPDX-License-Identifier: MPL-2.0
 
-import javax.inject.Inject
 import pgm.BuildPgmExtractor
 import pgm.ExtractPgmDeclarations
 import pgm.EmitPgmBindings
@@ -24,51 +23,10 @@ abstract class DownloadPgmFile extends DefaultTask {
     }
 }
 
-abstract class GenerateLegacyPgmBindings extends DefaultTask {
-    @Inject
-    abstract ExecOperations getExecOperations()
-
-    @Internal
-    abstract RegularFileProperty getLocalExecutable()
-
-    @Internal
-    abstract ConfigurableFileCollection getDownloadedExecutables()
-
-    @Internal
-    abstract Property<String> getExecutableName()
-
-    @InputFiles
-    abstract ConfigurableFileCollection getHeaders()
-
-    @OutputDirectory
-    abstract DirectoryProperty getGeneratedSources()
-
-    @TaskAction
-    void generate() {
-        def executable = localExecutable.orNull?.asFile
-        if (executable == null) {
-            def matches = downloadedExecutables.files.findAll { it.name == executableName.get() }
-            if (matches.size() != 1) {
-                throw new GradleException("Expected exactly one jextract executable, but found ${matches.size()}: $matches")
-            }
-            executable = matches.first()
-        }
-        execOperations.exec {
-            commandLine executable, '--output', generatedSources.get().asFile,
-                    '--target-package', 'org.lfenergy.pgm',
-                    '--header-class-name', 'PowerGridModelC', *headers.files.toList()
-        }
-    }
-}
-
 def version = providers.provider { project.ext.pgmWheelVersion }
 def pgmDir = layout.buildDirectory.dir('pgm').get()
 def wheels = pgmDir.dir('download')
-def headers = pgmDir.dir('headers')
 def nativeLibraries = pgmDir.dir('lib')
-def generatedSources = pgmDir.dir('generated-src')
-def candidateSources = pgmDir.dir('portable-src')
-def usePortable = providers.gradleProperty('pgmPortableBindings').map { it.toBoolean() }.getOrElse(false)
 
 def platforms = [
     x86_64_macosx : ['macosx_13_0_x86_64', 'lib/libpower_grid_model_c.dylib', 'dylib'],
@@ -108,66 +66,26 @@ platforms.each { slug, platform ->
     allLibraries.configure { dependsOn(extract) }
 }
 
-def extractWheelHeaders = { String taskName, String slug, Directory output ->
-    tasks.register(taskName, Sync) {
-        dependsOn(tasks.named("downloadPGMWheel_$slug"))
-        def includeRoot = "$wheelPrefix/include"
-        from(zipTree(wheels.file("power_grid_model_${slug}.whl"))) {
-            include "$includeRoot/**/*.h"
-            eachFile { path = path.substring(includeRoot.length() + 1) }
-        }
-        includeEmptyDirs = false
-        into(output)
-    }
-}
-def extractHeaders = extractWheelHeaders('extractPGMHeaderFiles', 'x86_64_linux', headers)
-
-def jextractDir = layout.buildDirectory.dir('jextract').get()
-def jextractArchive = jextractDir.file('jextract.tar.gz')
 def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
 def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
-def arm = arch in ['aarch64', 'arm64']
-def toolPlatform
-if (os.contains('linux')) {
-    toolPlatform = arm ? 'linux_aarch64' : 'linux_x64'
-} else if (os.contains('mac')) {
-    toolPlatform = arm ? 'macos_aarch64' : 'macos_x64'
-} else if (os.contains('windows') && arch in ['amd64', 'x86_64']) {
-    toolPlatform = 'windows_x64'
-} else {
+def architecture = [amd64: 'x86_64', x86_64: 'x86_64', arm64: 'arm64', aarch64: 'arm64'][arch]
+def operatingSystem = os.contains('mac') ? 'macosx' : os.contains('linux') ? 'linux' : os.contains('windows') ? 'windows' : null
+def hostSlug = "${architecture}_${operatingSystem}".toString()
+if (!platforms.containsKey(hostSlug)) {
     throw new GradleException("Unsupported platform: $os / $arch")
 }
-def jextractUrl = providers.gradleProperty("jextract_${toolPlatform}_url").get()
-def downloadJextract = tasks.register('downloadJextract', DownloadPgmFile) {
-    downloadUrl.set(jextractUrl)
-    destination.set(jextractArchive)
-}
-def extractJextract = tasks.register('extractJextract', Copy) {
-    dependsOn(downloadJextract)
-    from(tarTree(resources.gzip(jextractArchive.asFile)))
-    into(jextractDir)
-}
-def localJextract = providers.gradleProperty('jextract_bin').orNull
-def generateLegacy = tasks.register('generateLegacyPGMBindings', GenerateLegacyPgmBindings) {
-    if (localJextract != null) {
-        localExecutable.set(file(localJextract))
-    } else {
-        dependsOn(extractJextract)
-        downloadedExecutables.from(fileTree(jextractDir) { include '**/bin/*' })
-        executableName.set(os.contains('windows') ? 'jextract.exe' : 'jextract')
+def nativeHeaders = pgmDir.dir("headers-${hostSlug}")
+def extractNativeHeaders = tasks.register('extractPGMHeaderFiles', Sync) {
+    dependsOn(tasks.named("downloadPGMWheel_$hostSlug"))
+    def includeRoot = "$wheelPrefix/include"
+    from(zipTree(wheels.file("power_grid_model_${hostSlug}.whl"))) {
+        include "$includeRoot/**/*.h"
+        eachFile { path = path.substring(includeRoot.length() + 1) }
     }
-    dependsOn(extractHeaders)
-    getHeaders().from(headers.file('power_grid_model_c.h'), headers.file('power_grid_model_c/dataset_definitions.h'))
-    getGeneratedSources().set(generatedSources)
+    includeEmptyDirs = false
+    into(nativeHeaders)
 }
 
-def hostSlug = [
-    linux_aarch64: 'arm64_linux', linux_x64: 'x86_64_linux',
-    macos_aarch64: 'arm64_macosx', macos_x64: 'x86_64_macosx',
-    windows_x64: 'x86_64_windows'
-][toolPlatform]
-def nativeHeaders = pgmDir.dir("headers-${hostSlug}")
-def extractNativeHeaders = extractWheelHeaders('extractNativePGMHeaders', hostSlug, nativeHeaders)
 def llvmRoot = providers.gradleProperty('pgmLlvmDir').orElse(providers.environmentVariable('PGM_LLVM_DIR'))
 def nativeSource = layout.projectDirectory.dir('buildSrc/src/main/native/pgm-bindings')
 def nativeTool = pgmDir.dir('native-tool')
@@ -175,6 +93,11 @@ def executable = nativeTool.file(os.contains('windows') ? 'bin/pgm-extract.exe' 
 def buildExtractor = tasks.register('buildPGMExtractor', BuildPgmExtractor) {
     source.set(nativeSource)
     llvmDirectory.set(llvmRoot)
+    inputs.files(llvmRoot.map { path ->
+        ['llvm/LLVMConfigVersion.cmake', 'clang/ClangConfigVersion.cmake'].collect {
+            new File(path, "lib/cmake/${it}")
+        }
+    }.orElse([])).withPropertyName('llvmPackageVersions').withPathSensitivity(PathSensitivity.NONE)
     output.set(nativeTool)
 }
 def sdk = providers.gradleProperty('pgmClangSdk')
@@ -192,17 +115,14 @@ def inspect = tasks.register('inspectPGMDeclarations', ExtractPgmDeclarations) {
     wheelVersion.set(version.get())
     inventory.set(pgmDir.file('declarations.json'))
 }
-def generateCandidate = tasks.register('generatePortablePGMBindings', EmitPgmBindings) {
+def generate = tasks.register('generatePGMBindings', EmitPgmBindings) {
     inventory.set(inspect.flatMap { it.inventory })
-    output.set(candidateSources)
-}
-def generate = tasks.register('generatePGMBindings') {
-    dependsOn(usePortable ? generateCandidate : generateLegacy)
+    output.set(pgmDir.dir('portable-src'))
 }
 def referencePath = providers.gradleProperty('pgmBindingReference').orNull
 tasks.register('fingerprintPGMBindings', BindingFingerprint) {
     inventory.set(inspect.flatMap { it.inventory })
-    sourceDirectory.set(generateCandidate.flatMap { it.output })
+    sourceDirectory.set(generate.flatMap { it.output })
     wheelVersion.set(version.get())
     destination.set(pgmDir.file('binding-fingerprint.json'))
     if (referencePath != null) {
@@ -211,7 +131,7 @@ tasks.register('fingerprintPGMBindings', BindingFingerprint) {
 }
 
 plugins.withId('java') {
-    sourceSets.main.java.srcDir(usePortable ? candidateSources : generatedSources)
+    sourceSets.main.java.srcDir(generate.flatMap { it.output })
     sourceSets.main.resources.srcDir(nativeLibraries)
     tasks.named('compileJava') { dependsOn(generate) }
     tasks.named('processResources') { dependsOn(allLibraries) }
