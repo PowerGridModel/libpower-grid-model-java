@@ -66,21 +66,19 @@ jobs:
           echo "updated=true" >> "$GITHUB_OUTPUT"
           echo "current_version=${current_version}" >> "$GITHUB_OUTPUT"
           echo "latest_version=${latest_version}" >> "$GITHUB_OUTPUT"
-          echo "branch_name=automation/update-pgm-wheel-version-${latest_version}" >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
-        if: steps.update-version.outputs.updated == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
           token: ${{ steps.generate-token.outputs.token }}
-          commit-message: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
-          branch: ${{ steps.update-version.outputs.branch_name }}
+          commit-message: "build: update PGM wheel version"
+          branch: automation/update-pgm-wheel-version
           signoff: true
           sign-commits: true
           delete-branch: true
-          title: "build: update PGM wheel version to ${{ steps.update-version.outputs.latest_version }}"
+          title: "build: update PGM wheel version"
           body: |
-            Updates `pgmVersion` in `build.gradle` from `${{ steps.update-version.outputs.current_version }}` to `${{ steps.update-version.outputs.latest_version }}`.
+            Updates `pgmVersion` in `build.gradle``.
 
             Source: latest GitHub release from `PowerGridModel/power-grid-model`.
           labels: |
