@@ -1,64 +1,93 @@
 // SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
 // SPDX-License-Identifier: MPL-2.0
 
-#include <clang/AST/ASTConsumer.h>
-#include <clang/AST/ASTContext.h>
-#include <clang/AST/Attr.h>
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/TargetInfo.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Frontend/FrontendActions.h>
-#include <clang/Tooling/Tooling.h>
+#include <clang-c/Index.h>
 #include <llvm/ADT/StringSwitch.h>
+#include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/JSON.h>
-#include <llvm/Support/Path.h>
+#include <llvm/Support/raw_ostream.h>
+
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <map>
+#include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace {
-using namespace clang;
 using llvm::json::Array;
 using llvm::json::Object;
 using llvm::json::Value;
+
+std::string text(CXString value) {
+    auto const* data = clang_getCString(value);
+    std::string result = data ? data : "";
+    clang_disposeString(value);
+    return result;
+}
+
+std::string normalized(std::string path) {
+    std::replace(path.begin(), path.end(), '\\', '/');
+    return path;
+}
+
+bool unsignedInteger(CXTypeKind kind) {
+    switch (kind) {
+    case CXType_Char_U: case CXType_UChar: case CXType_UShort: case CXType_UInt:
+    case CXType_ULong: case CXType_ULongLong: case CXType_UInt128: return true;
+    default: return false;
+    }
+}
+
+bool signedInteger(CXTypeKind kind) {
+    switch (kind) {
+    case CXType_Char_S: case CXType_SChar: case CXType_Short: case CXType_Int:
+    case CXType_Long: case CXType_LongLong: case CXType_Int128: return true;
+    default: return false;
+    }
+}
 
 struct Binding {
     std::string location;
     Value shape;
 };
 
-class Consumer : public ASTConsumer {
-    ASTContext& ast;
-    SourceManager& sources;
-    std::string includeRoot;
+class Consumer {
+    std::string root;
+    std::string target;
     std::map<std::string, Binding> bindings;
-    Object& output;
-    const NamedDecl* declaration = nullptr;
+    CXCursor declaration{};
+    std::string location;
+    bool failed = false;
 
     void reject(const std::string& reason) {
-        auto& diagnostics = ast.getDiagnostics();
-        auto id = diagnostics.getCustomDiagID(DiagnosticsEngine::Error, "%0 [%1]: %2");
-        diagnostics.Report(declaration->getLocation(), id)
-            << declaration->getNameAsString() << ast.getTargetInfo().getTriple().str() << reason;
+        failed = true;
+        llvm::errs() << location << ": error: " << text(clang_getCursorSpelling(declaration))
+                     << " [" << target << "]: " << reason << '\n';
     }
 
-    std::optional<Object> unsupported(QualType type, llvm::StringRef reason) {
-        reject(type.getAsString() + ": " + reason.str());
+    std::optional<Object> unsupported(CXType type, const std::string& reason) {
+        reject(text(clang_getTypeSpelling(type)) + ": " + reason);
         return std::nullopt;
     }
 
-    std::optional<Object> prototype(const FunctionProtoType* fn) {
-        if (fn->isVariadic() || fn->getCallConv() != CC_C) {
+    std::optional<Object> prototype(CXType type) {
+        if (type.kind != CXType_FunctionProto) {
+            return unsupported(type, "expected a prototype");
+        }
+        if (clang_isFunctionTypeVariadic(type) || clang_getFunctionTypeCallingConv(type) != CXCallingConv_C) {
             reject("variadic or non-default calling convention is unsupported");
             return std::nullopt;
         }
-        auto result = describe(fn->getReturnType());
+        auto result = describe(clang_getResultType(type));
         if (!result) {
             return std::nullopt;
         }
         Array args;
-        for (auto parameter : fn->getParamTypes()) {
-            auto arg = describe(parameter);
+        for (int i = 0, count = clang_getNumArgTypes(type); i < count; ++i) {
+            auto arg = describe(clang_getArgType(type, i));
             if (!arg) {
                 return std::nullopt;
             }
@@ -67,210 +96,249 @@ class Consumer : public ASTConsumer {
         return Object{{"result", std::move(*result)}, {"args", std::move(args)}};
     }
 
-    std::optional<Object> describe(QualType type, bool pointee = false) {
-        bool isConst = type.isConstQualified();
-        if (type.isVolatileQualified() || type.isRestrictQualified()) {
+    std::optional<Object> describe(CXType type, bool pointee = false, bool inheritedConst = false) {
+        bool isConst = inheritedConst || clang_isConstQualifiedType(type);
+        if (clang_isVolatileQualifiedType(type) || clang_isRestrictQualifiedType(type)) {
             return unsupported(type, "volatile and restrict qualifiers are unsupported");
         }
-        auto shape = [&](llvm::StringRef kind) {
-            return Object{{"kind", kind}, {"const", isConst}};
+        auto shape = [&](std::string kind) {
+            return Object{{"kind", std::move(kind)}, {"const", isConst}};
         };
-        auto const* raw = type.getTypePtr();
-        if (auto const* alias = dyn_cast<TypedefType>(raw)) {
-            auto name = alias->getDecl()->getName();
-            unsigned bits = llvm::StringSwitch<unsigned>(name)
-                .Cases({"int8_t", "uint8_t"}, 8).Cases({"int16_t", "uint16_t"}, 16)
-                .Cases({"int32_t", "uint32_t"}, 32).Cases({"int64_t", "uint64_t"}, 64)
-                .Case("size_t", 64).Default(0);
-            if (bits) {
-                bool isUnsigned = name.starts_with("u") || name == "size_t";
-                if (!sources.isInSystemHeader(alias->getDecl()->getLocation())
-                    || !type->isIntegerType() || ast.getTypeSize(type) != bits
-                    || type->isUnsignedIntegerType() != isUnsigned || ast.getTypeAlign(type) != bits) {
+        auto hasLayout = [&](long long bytes) {
+            return clang_Type_getSizeOf(type) == bytes && clang_Type_getAlignOf(type) == bytes;
+        };
+        switch (type.kind) {
+        case CXType_Elaborated:
+            return describe(clang_Type_getNamedType(type), pointee, isConst);
+        case CXType_Typedef: {
+            auto alias = clang_getTypeDeclaration(type);
+            auto name = text(clang_getCursorSpelling(alias));
+            auto bytes = llvm::StringSwitch<int>(name)
+                .Case("int8_t", 1).Case("uint8_t", 1)
+                .Case("int16_t", 2).Case("uint16_t", 2)
+                .Case("int32_t", 4).Case("uint32_t", 4)
+                .Case("int64_t", 8).Case("uint64_t", 8)
+                .Case("size_t", 8).Default(0);
+            if (bytes) {
+                auto kind = clang_getCanonicalType(type).kind;
+                bool isUnsigned = name.front() == 'u' || name == "size_t";
+                if (!clang_Location_isInSystemHeader(clang_getCursorLocation(alias))
+                    || !(isUnsigned ? unsignedInteger(kind) : signedInteger(kind)) || !hasLayout(bytes)) {
                     return unsupported(type, "unexpected size, signedness or alignment of standard type");
                 }
-                return shape(name);
+                return shape(std::move(name));
             }
-            auto underlying = alias->desugar();
-            return describe(isConst ? underlying.withConst() : underlying, pointee);
+            return describe(clang_getTypedefDeclUnderlyingType(alias), pointee, isConst);
         }
-        if (auto const* pointer = dyn_cast<PointerType>(raw)) {
-            auto target = describe(pointer->getPointeeType(), true);
-            if (!target) {
+        case CXType_Pointer: {
+            auto pointeeType = describe(clang_getPointeeType(type), true);
+            if (!pointeeType) {
                 return std::nullopt;
             }
-            if (ast.getTypeSize(type) != 64 || ast.getTypeAlign(type) != 64) {
+            if (!hasLayout(8)) {
                 return unsupported(type, "expected a 64-bit address with 64-bit alignment");
             }
             auto result = shape("pointer");
-            result["pointee"] = std::move(*target);
+            result["pointee"] = std::move(*pointeeType);
             return result;
         }
-        if (auto const* fn = dyn_cast<FunctionProtoType>(raw); fn && pointee) {
-            auto signature = prototype(fn);
-            if (!signature) {
-                return std::nullopt;
+        case CXType_FunctionProto:
+            if (pointee) {
+                auto signature = prototype(type);
+                if (signature) {
+                    (*signature)["kind"] = "function";
+                }
+                return signature;
             }
-            (*signature)["kind"] = "function";
-            return signature;
-        }
-        if (auto const* record = dyn_cast<RecordType>(raw);
-            record && pointee && !record->getDecl()->getDefinition() && record->getDecl()->getIdentifier()) {
-            auto result = shape("opaque");
-            result["name"] = record->getDecl()->getName();
-            return result;
-        }
-        if (auto const* primitive = dyn_cast<BuiltinType>(raw)) {
-            llvm::StringRef kind;
-            unsigned bits = 0;
-            switch (primitive->getKind()) {
-            case BuiltinType::Void: return shape("void");
-            case BuiltinType::Char_S:
-            case BuiltinType::Char_U: kind = "char"; bits = 8; break;
-            case BuiltinType::Int: kind = "int"; bits = 32; break;
-            case BuiltinType::Double: kind = "double"; bits = 64; break;
-            default: return unsupported(type, "use a supported primitive or a fixed-width typedef");
+            break;
+        case CXType_Record: {
+            auto record = clang_getTypeDeclaration(type);
+            auto name = text(clang_getCursorSpelling(record));
+            if (pointee && clang_Cursor_isNull(clang_getCursorDefinition(record))
+                && !clang_Cursor_isAnonymous(record) && !name.empty()) {
+                auto result = shape("opaque");
+                result["name"] = std::move(name);
+                return result;
             }
-            if (ast.getTypeSize(type) != bits || ast.getTypeAlign(type) != bits) {
-                return unsupported(type, "unexpected primitive width or alignment");
-            }
-            return shape(kind);
+            break;
         }
-        if (auto const* paren = dyn_cast<ParenType>(raw)) {
-            auto inner = paren->getInnerType();
-            return describe(isConst ? inner.withConst() : inner, pointee);
+        case CXType_Void: return shape("void");
+        case CXType_Char_S: case CXType_Char_U:
+            if (hasLayout(1)) return shape("char");
+            return unsupported(type, "unexpected primitive width or alignment");
+        case CXType_Int:
+            if (hasLayout(4)) return shape("int");
+            return unsupported(type, "unexpected primitive width or alignment");
+        case CXType_Double:
+            if (hasLayout(8)) return shape("double");
+            return unsupported(type, "unexpected primitive width or alignment");
+        default: break;
         }
         return unsupported(type, "unsupported type in the portable PGM API");
     }
 
-    void add(llvm::StringRef name, Object shape, llvm::StringRef location) {
-        auto existing = bindings.find(name.str());
+    void add(CXCursor cursor, Object shape) {
+        auto name = text(clang_getCursorSpelling(cursor));
+        auto existing = bindings.find(name);
         if (existing != bindings.end()) {
             if (existing->second.shape != Value(std::move(shape))) {
-                reject("conflicting redeclaration: " + name.str());
+                reject("conflicting redeclaration: " + name);
             }
             return;
         }
-        bindings.emplace(name.str(), Binding{location.str(), Value(std::move(shape))});
+        bindings.emplace(std::move(name), Binding{location, Value(std::move(shape))});
     }
 
-    bool exported(const NamedDecl& decl) {
-        if (decl.hasAttr<DLLImportAttr>() || decl.hasAttr<DLLExportAttr>()) {
+    bool exported(CXCursor cursor) {
+        struct Attributes {
+            bool dll = false;
+            std::optional<std::string> visibility;
+        } attrs;
+        clang_visitChildren(cursor, [](CXCursor child, CXCursor, CXClientData data) {
+            auto& attrs = *static_cast<Attributes*>(data);
+            switch (clang_getCursorKind(child)) {
+            case CXCursor_DLLImport: case CXCursor_DLLExport:
+                attrs.dll = true;
+                break;
+            case CXCursor_VisibilityAttr:
+                attrs.visibility = text(clang_getCursorSpelling(child));
+                break;
+            default: break;
+            }
+            return CXChildVisit_Continue;
+        }, &attrs);
+        if (attrs.dll) {
             return true;
         }
-        if (auto const* visibility = decl.getAttr<VisibilityAttr>()) {
-            return visibility->getVisibility() == VisibilityAttr::Default;
-        }
-        if (decl.getFormalLinkage() == Linkage::External) {
+        if (attrs.visibility) {
+            if (*attrs.visibility == "default") return true;
+            if (*attrs.visibility == "hidden" || *attrs.visibility == "protected") return false;
+            reject("unrecognized explicit PGM visibility annotation");
+        } else if (clang_getCursorLinkage(cursor) == CXLinkage_External) {
             reject("external declaration is missing a public or hidden PGM visibility annotation");
         }
         return false;
     }
 
-    void visit(const NamedDecl& decl, llvm::StringRef location) {
-        if (auto const* fn = dyn_cast<FunctionDecl>(&decl); fn && exported(decl)) {
-            auto const* proto = fn->getType()->getAs<FunctionProtoType>();
-            if (auto signature = proto ? prototype(proto) : unsupported(fn->getType(), "expected a prototype")) {
-                (*signature)["kind"] = "function";
-                add(decl.getName(), std::move(*signature), location);
-            }
-        } else if (auto const* variable = dyn_cast<VarDecl>(&decl); variable && exported(decl)) {
-            auto type = variable->getType();
-            if (!type->isPointerType() || variable->getTLSKind() != VarDecl::TLS_None
-                    || variable->getStorageClass() != SC_Extern || variable->hasInit()) {
-                reject("expected a non-thread-local extern pointer declaration, got " + type.getAsString());
-                return;
-            }
-            if (auto pointer = describe(type)) {
-                add(decl.getName(), Object{{"kind", "global"}, {"type", std::move(*pointer)}}, location);
-            }
-        } else if (auto const* alias = dyn_cast<TypedefNameDecl>(&decl)) {
-            auto type = alias->getUnderlyingType();
-            if (auto description = describe(type, type->isRecordType())) {
-                add(decl.getName(), Object{{"kind", "typedef"}, {"type", std::move(*description)}}, location);
-            }
-        } else if (auto const* enumeration = dyn_cast<EnumDecl>(&decl)) {
-            for (auto const* constant : enumeration->enumerators()) {
-                auto value = constant->getInitVal();
-                if (!value.isSignedIntN(32) || (value.isUnsigned() && value.getActiveBits() > 31)) {
-                    declaration = constant;
-                    reject("enum constant does not fit the Java int carrier");
-                } else {
-                    add(constant->getName(), Object{{"kind", "constant"}, {"value", value.getExtValue()}}, location);
+    void visit(CXCursor cursor) {
+        CXFile file = nullptr;
+        unsigned line = 0, column = 0;
+        clang_getExpansionLocation(clang_getCursorLocation(cursor), &file, &line, &column, nullptr);
+        if (!file) return;
+        auto path = normalized(text(clang_getFileName(file)));
+        llvm::StringRef relative(path);
+        if (!relative.consume_front(root)
+            || (relative != "power_grid_model_c.h" && !relative.starts_with("power_grid_model_c/"))) {
+            return;
+        }
+        declaration = cursor;
+        location = relative.str() + ":" + std::to_string(line) + ":" + std::to_string(column);
+        auto type = clang_getCursorType(cursor);
+        switch (clang_getCursorKind(cursor)) {
+        case CXCursor_FunctionDecl:
+            if (exported(cursor)) {
+                if (auto signature = prototype(type)) {
+                    (*signature)["kind"] = "function";
+                    add(cursor, std::move(*signature));
                 }
             }
-        } else if (!isa<FunctionDecl, VarDecl, RecordDecl>(&decl)) {
-            reject("unsupported public declaration form");
+            break;
+        case CXCursor_VarDecl:
+            if (exported(cursor)) {
+                if (clang_getCanonicalType(type).kind != CXType_Pointer || clang_getCursorTLSKind(cursor) != CXTLS_None
+                    || clang_Cursor_getStorageClass(cursor) != CX_SC_Extern
+                    || !clang_Cursor_isNull(clang_Cursor_getVarDeclInitializer(cursor))) {
+                    reject("expected a non-thread-local extern pointer declaration, got " + text(clang_getTypeSpelling(type)));
+                } else if (auto pointer = describe(type)) {
+                    add(cursor, Object{{"kind", "global"}, {"type", std::move(*pointer)}});
+                }
+            }
+            break;
+        case CXCursor_TypedefDecl: case CXCursor_TypeAliasDecl: {
+            auto underlying = clang_getTypedefDeclUnderlyingType(cursor);
+            if (auto description = describe(underlying, clang_getCanonicalType(underlying).kind == CXType_Record)) {
+                add(cursor, Object{{"kind", "typedef"}, {"type", std::move(*description)}});
+            }
+            break;
+        }
+        case CXCursor_EnumDecl:
+            clang_visitChildren(cursor, [](CXCursor child, CXCursor parent, CXClientData data) {
+                if (clang_getCursorKind(child) == CXCursor_EnumConstantDecl) {
+                    auto& self = *static_cast<Consumer*>(data);
+                    auto value = clang_getEnumConstantDeclValue(child);
+                    auto kind = clang_getCanonicalType(clang_getEnumDeclIntegerType(parent)).kind;
+                    if (value < std::numeric_limits<std::int32_t>::min() || value > std::numeric_limits<std::int32_t>::max()
+                        || (unsignedInteger(kind) && clang_getEnumConstantDeclUnsignedValue(child) > std::numeric_limits<std::int32_t>::max())) {
+                        self.declaration = child;
+                        self.reject("enum constant does not fit the Java int carrier");
+                    } else {
+                        self.add(child, Object{{"kind", "constant"}, {"value", value}});
+                    }
+                }
+                return CXChildVisit_Continue;
+            }, this);
+            break;
+        case CXCursor_StructDecl: case CXCursor_UnionDecl: break;
+        default: reject("unsupported public declaration form");
         }
     }
 
 public:
-    Consumer(ASTContext& ast, std::string root, Object& output)
-        : ast(ast), sources(ast.getSourceManager()), includeRoot(std::move(root)), output(output) {}
+    Consumer(std::string root, std::string target)
+        : root(normalized(std::move(root))), target(std::move(target)) {
+        if (this->root.back() != '/') this->root += '/';
+    }
 
-    void HandleTranslationUnit(ASTContext& context) override {
-        for (auto const* node : context.getTranslationUnitDecl()->decls()) {
-            auto const* named = dyn_cast<NamedDecl>(node);
-            if (!named || named->isImplicit()) {
-                continue;
-            }
-            auto location = sources.getPresumedLoc(sources.getExpansionLoc(named->getLocation()));
-            if (location.isInvalid()) {
-                continue;
-            }
-            llvm::StringRef relative(location.getFilename());
-            if (!relative.consume_front(includeRoot) || relative.empty()
-                || !llvm::sys::path::is_separator(relative.front())) {
-                continue;
-            }
-            relative = relative.drop_front();
-            if (relative != "power_grid_model_c.h" && !relative.starts_with("power_grid_model_c/")
-                && !relative.starts_with("power_grid_model_c\\")) {
-                continue;
-            }
-            declaration = named;
-            auto path = relative.str();
-            std::replace(path.begin(), path.end(), '\\', '/');
-            visit(*named, path + ":" + std::to_string(location.getLine()) + ":" + std::to_string(location.getColumn()));
-        }
+    std::optional<Object> extract(CXTranslationUnit tu) {
+        clang_visitChildren(clang_getTranslationUnitCursor(tu), [](CXCursor cursor, CXCursor, CXClientData data) {
+            static_cast<Consumer*>(data)->visit(cursor);
+            return CXChildVisit_Continue;
+        }, this);
+        if (failed || bindings.empty()) return std::nullopt;
         Array declarations;
         for (auto& [name, binding] : bindings) {
             declarations.emplace_back(Object{{"name", name}, {"location", binding.location},
                 {"shape", std::move(binding.shape)}});
         }
-        output = Object{{"target", context.getTargetInfo().getTriple().str()},
-            {"declarations", std::move(declarations)}};
-    }
-};
-
-class Action : public ASTFrontendAction {
-    std::string root;
-    Object& output;
-
-public:
-    Action(std::string root, Object& output) : root(std::move(root)), output(output) {}
-
-    std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance& compiler, llvm::StringRef) override {
-        return std::make_unique<Consumer>(compiler.getASTContext(), root, output);
+        return Object{{"target", target}, {"declarations", std::move(declarations)}};
     }
 };
 }
 
 int main(int argc, char** argv) {
-    if (argc < 3) {
+    if (argc < 3 || !*argv[1]) {
         llvm::errs() << "usage: pgm-extract <absolute-header-directory> <absolute-clang-path> [clang flags...]\n";
         return 2;
     }
-    std::string root = argv[1];
-    std::vector<std::string> flags{"-x", "c", "-std=c23", "-Werror", "-I", root};
+    constexpr char source[] = "#include <power_grid_model_c.h>\n#include <power_grid_model_c/dataset_definitions.h>\n";
+    CXUnsavedFile input{"pgm-bindings.c", source, sizeof(source) - 1};
+    // libclang takes a full argv so Clang can locate its resource headers relative to the installed driver.
+    std::vector<char const*> flags{argv[2], "-x", "c", "-std=c2x", "-Werror", "-I", argv[1]};
     flags.insert(flags.end(), argv + 3, argv + argc);
-    Object result;
-    bool ok = clang::tooling::runToolOnCodeWithArgs(std::make_unique<Action>(root, result),
-        "#include <power_grid_model_c.h>\n#include <power_grid_model_c/dataset_definitions.h>\n",
-        flags, "pgm-bindings.c", argv[2]);
-    if (!ok || result.empty() || result.getArray("declarations")->empty()) {
+    std::unique_ptr<void, decltype(&clang_disposeIndex)> index(clang_createIndex(0, 0), clang_disposeIndex);
+    CXTranslationUnit parsed = nullptr;
+    auto status = clang_parseTranslationUnit2FullArgv(index.get(), input.Filename, flags.data(),
+        static_cast<int>(flags.size()), &input, 1, 0, &parsed);
+    if (status != CXError_Success) {
+        llvm::errs() << "PGM header parse failed (libclang error " << status << ")\n";
+        return 1;
+    }
+    std::unique_ptr<CXTranslationUnitImpl, decltype(&clang_disposeTranslationUnit)> tu(parsed, clang_disposeTranslationUnit);
+    bool parseFailed = false;
+    for (unsigned i = 0, count = clang_getNumDiagnostics(tu.get()); i < count; ++i) {
+        auto diagnostic = clang_getDiagnostic(tu.get(), i);
+        llvm::errs() << text(clang_formatDiagnostic(diagnostic, clang_defaultDiagnosticDisplayOptions())) << '\n';
+        parseFailed |= clang_getDiagnosticSeverity(diagnostic) >= CXDiagnostic_Error;
+        clang_disposeDiagnostic(diagnostic);
+    }
+    if (parseFailed) return 1;
+    auto targetInfo = clang_getTranslationUnitTargetInfo(tu.get());
+    auto target = text(clang_TargetInfo_getTriple(targetInfo));
+    clang_TargetInfo_dispose(targetInfo);
+    auto result = Consumer(argv[1], std::move(target)).extract(tu.get());
+    if (!result) {
         llvm::errs() << "PGM header extraction failed or produced no declarations\n";
         return 1;
     }
-    llvm::outs() << llvm::formatv("{0}\n", Value(std::move(result)));
+    llvm::outs() << llvm::formatv("{0}\n", Value(std::move(*result)));
 }

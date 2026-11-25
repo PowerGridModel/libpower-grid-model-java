@@ -40,28 +40,12 @@ runs:
 
     - name: Set up PGM binding toolchain
       shell: bash
-      env:
-        LLVM_VERSION: '23.1.4'
-        LLVM_SHA256: efdd1dbd089b99bfcfcde7b8eb1236163f2e88df5a981cca4f783ec9cb5e0378
       run: |
         set -euo pipefail
         sudo apt-get update
-        sudo apt-get install -y libxml2-dev libzstd-dev zlib1g-dev zstd
-        cmake --version
-        c++ --version
-        archive="LLVM-${LLVM_VERSION}-Linux-X64.tar.zst"
-        prefix="${RUNNER_TEMP}/pgm-llvm-${LLVM_VERSION}"
-        curl --fail --silent --show-error --location --retry 3 \
-          "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/${archive}" \
-          --output "${RUNNER_TEMP}/${archive}"
-        echo "${LLVM_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check
-        mkdir -p "$prefix"
-        zstd -dc --long=30 "${RUNNER_TEMP}/${archive}" | tar -xf - -C "$prefix" --strip-components=1
-        rm "${RUNNER_TEMP}/${archive}"
+        sudo apt-get install -y clang libclang-dev llvm-dev libxml2-dev libzstd-dev zlib1g-dev
+        prefix="$(llvm-config --prefix)"
         "$prefix/bin/clang" --version
-        test -f "$prefix/lib/cmake/llvm/LLVMConfig.cmake"
-        test -f "$prefix/lib/cmake/clang/ClangConfig.cmake"
-        test -f "$prefix/include/clang/Tooling/Tooling.h"
         echo "PGM_LLVM_DIR=$prefix" >> "$GITHUB_ENV"
 
     - name: Setup Gradle

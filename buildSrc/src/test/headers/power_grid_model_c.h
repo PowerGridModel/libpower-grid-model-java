@@ -23,3 +23,16 @@ typedef unsigned long PGM_Forbidden;
 PGM_API int PGM_bad_parameter(PGM_Forbidden value);
 PGM_API void PGM_bad_variadic(int count, ...);
 #endif
+
+#ifdef PGM_FIXTURE_EXPORTS
+#ifdef _WIN32
+__declspec(dllexport) int PGM_dll_export(void);
+#else
+#define PGM_HIDDEN __attribute__((visibility("hidden")))
+PGM_HIDDEN int PGM_hidden(void);
+#endif
+#endif
+
+#ifdef PGM_FIXTURE_UNANNOTATED
+int PGM_unannotated(void);
+#endif

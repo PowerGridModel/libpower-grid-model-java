@@ -27,10 +27,10 @@ To load the native library there are two options:
 ## Building from source
 
 Install Java 25, CMake 3.20+, a native C/C++ toolchain with system headers, and
-**LLVM/Clang 23.1.4** with LibTooling and CMake package files.
-Use Xcode command-line tools on macOS, the Windows SDK and MSVC headers on
-Windows, or `libxml2-dev`, `libzstd-dev`, and `zlib1g-dev` with the official
-LLVM archive on Ubuntu.
+matching LLVM and Clang development packages with libclang and CMake package
+files. Use Xcode command-line tools on macOS or the Windows SDK and MSVC headers
+on Windows. On Ubuntu, install `clang`, `libclang-dev`, `llvm-dev`,
+`libxml2-dev`, `libzstd-dev`, and `zlib1g-dev`.
 
 Set `PGM_LLVM_DIR` to the absolute LLVM install path (or pass `-PpgmLlvmDir=...`)
 and run `./gradlew build --configuration-cache` (`gradlew.bat` on Windows).

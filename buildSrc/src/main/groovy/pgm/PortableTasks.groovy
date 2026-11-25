@@ -87,7 +87,7 @@ abstract class EmitPgmBindings extends DefaultTask {
 final class LlvmInstallation {
     static File require(Property<String> path) {
         if (!path.isPresent()) {
-            throw new GradleException('LLVM/Clang 23.1.4 development tools are required; set pgmLlvmDir or PGM_LLVM_DIR to their installation directory.')
+            throw new GradleException('LLVM and Clang development tools, including libclang, are required; set pgmLlvmDir or PGM_LLVM_DIR to their installation directory.')
         }
         def prefix = new File(path.get())
         if (!prefix.isAbsolute() || !prefix.isDirectory()) {
