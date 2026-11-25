@@ -2,12 +2,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-import javax.inject.Inject
-
-interface InjectedExecOps {
-    @Inject
-    ExecOperations getExecOperations()
-}
+import pgm.DownloadPgmFile
+import pgm.GeneratePgmBindings
+import pgm.WritePgmVersion
 
 def pgmVersion = project.property("pgmVersion")
 
@@ -50,10 +47,9 @@ def architectures = [
     ]
 ]
 
-tasks.register("extractPGMNativeLibsFromWheels") {
-    doLast {
-        nativeLibDir.file("version").asFile.write(pgmVersion)
-    }
+tasks.register("extractPGMNativeLibsFromWheels", WritePgmVersion) {
+    it.pgmVersion.set(pgmVersion)
+    versionFile.set(nativeLibDir.file("version"))
 }
 
 architectures.forEach { slug, architecture ->
@@ -64,22 +60,9 @@ architectures.forEach { slug, architecture ->
         dependsOn(tasks.named(extractNativeLibTaskName))
     }
 
-    tasks.register(downloadWheelTaskName) {
-        GString url = architecture.url
-        RegularFile wheelFile = architecture.wheelFile
-
-        outputs.file(wheelFile)
-
-        doLast {
-            def target = wheelFile.asFile
-            target.parentFile.mkdirs()
-
-            URI.create(url).toURL().withInputStream { input ->
-                target.withOutputStream { output ->
-                    output << input
-                }
-            }
-        }
+    tasks.register(downloadWheelTaskName, DownloadPgmFile) {
+        downloadUrl.set(architecture.url.toString())
+        destination.set(architecture.wheelFile)
     }
 
     tasks.register(extractNativeLibTaskName, Copy) {
@@ -176,17 +159,9 @@ def jextractUrlPropertyKey = {
 
 def jextractUrl = project.property(jextractUrlPropertyKey)
 
-tasks.register("downloadJextract") {
-    outputs.file(jextractArchive)
-    doLast {
-        def target = jextractArchive.asFile
-        target.parentFile.mkdirs()
-        URI.create(jextractUrl).toURL().withInputStream { input ->
-            target.withOutputStream { output ->
-                output << input
-            }
-        }
-    }
+tasks.register("downloadJextract", DownloadPgmFile) {
+    downloadUrl.set(jextractUrl)
+    destination.set(jextractArchive)
 }
 
 tasks.register("extractJextract", Copy) {
@@ -195,54 +170,24 @@ tasks.register("extractJextract", Copy) {
     into jextractDir
 }
 
-tasks.register("generatePGMBindings") {
+tasks.register("generatePGMBindings", GeneratePgmBindings) {
     // Use a local jextract installation by setting jextract_bin in gradle.properties,
     // otherwise jextract is downloaded and extracted automatically.
     def localJextractBin = project.findProperty("jextract_bin")
-    if (!localJextractBin) {
+    if (localJextractBin) {
+        jextractExecutables.from(file(localJextractBin))
+    } else {
         dependsOn(tasks.named('extractJextract'))
+        def executableName = osName.contains("windows") ? "jextract.exe" : "jextract"
+        jextractExecutables.from(fileTree(jextractDir) {
+            include "**/bin/$executableName"
+        })
     }
     dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
     dependsOn(tasks.named('extractPGMHeaderFiles'))
-    def execOps = project.objects.newInstance(InjectedExecOps)
-    inputs.files(
-            headersDir.file("power_grid_model_c.h"),
-            headersDir.file("power_grid_model_c/dataset_definitions.h")
-    )
-    outputs.dir(generatedJavaDir)
-    def jextractExecutables = fileTree(jextractDir) {
-        include "**/bin/*"
-    }
-    doLast {
-        def jextractBin
-        if (localJextractBin) {
-            jextractBin = file(localJextractBin)
-        } else {
-            def executableName = osName.contains("windows")
-                    ? "jextract.exe"
-                    : "jextract"
-            def jextractBins = jextractExecutables.files.findAll() {
-                it.name == executableName
-            }
-            if (jextractBins.size() != 1) {
-                throw new GradleException(
-                        "Expected exactly one Jextract executable, " +
-                                "but found ${jextractBins.size()}: $jextractBins"
-                )
-            }
-            jextractBin = jextractBins.first()
-        }
-        execOps.execOperations.exec {
-            commandLine jextractBin,
-                    "--output", generatedJavaDir,
-                    "--target-package", "org.lfenergy.pgm",
-                    "--header-class-name", "PowerGridModelC",
-                    headersDir.file("power_grid_model_c.h").asFile,
-                    headersDir.file(
-                            "power_grid_model_c/dataset_definitions.h"
-                    ).asFile
-        }
-    }
+    pgmHeader.set(headersDir.file("power_grid_model_c.h"))
+    datasetDefinitionsHeader.set(headersDir.file("power_grid_model_c/dataset_definitions.h"))
+    generatedJavaDirectory.set(generatedJavaDir)
 }
 
 sourceSets {
