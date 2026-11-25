@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-import pgm.BindingFingerprint
 import pgm.BuildPgmExtractor
 import pgm.DownloadPgmFile
 import pgm.EmitPgmBindings
@@ -131,15 +130,6 @@ def generate = tasks.register("generatePGMBindings", EmitPgmBindings) {
     inventory.set(inspect.flatMap { it.inventory })
     output.set(generatedJavaDir)
 }
-def referencePath = providers.gradleProperty("pgmBindingReference")
-tasks.register("fingerprintPGMBindings", BindingFingerprint) {
-    inventory.set(inspect.flatMap { it.inventory })
-    sourceDirectory.set(generate.flatMap { it.output })
-    wheelVersion.set(pgmVersion)
-    destination.set(pgmDir.file("binding-fingerprint.json"))
-    reference.set(layout.projectDirectory.file(referencePath))
-}
-
 sourceSets {
     main {
         java {
