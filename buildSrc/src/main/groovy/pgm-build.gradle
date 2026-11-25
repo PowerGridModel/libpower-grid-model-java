@@ -99,7 +99,7 @@ architectures.forEach { slug, architecture ->
 }
 
 tasks.register("extractPGMHeaderFiles", Copy) {
-    dependsOn(tasks.named("extractPGMNativeLibFromWheel_x86_64_linux"))
+    dependsOn(tasks.named("downloadPGMWheel_x86_64_linux"))
 
     RegularFile wheelFile = architectures.x86_64_linux.wheelFile
 
@@ -183,7 +183,6 @@ tasks.register("generatePGMBindings", GeneratePgmBindings) {
             include "**/bin/$executableName"
         })
     }
-    dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
     dependsOn(tasks.named('extractPGMHeaderFiles'))
     pgmHeader.set(headersDir.file("power_grid_model_c.h"))
     datasetDefinitionsHeader.set(headersDir.file("power_grid_model_c/dataset_definitions.h"))
@@ -206,5 +205,5 @@ tasks.named('compileJava') {
 }
 
 tasks.named('processResources') {
-    dependsOn(tasks.named('generatePGMBindings'))
+    dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
 }
