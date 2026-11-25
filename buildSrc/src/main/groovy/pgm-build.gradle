@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import pgm.DownloadPgmFile
+import pgm.ExtractPgmNativeLibrary
 import pgm.GeneratePgmBindings
 import pgm.WritePgmVersion
 
@@ -60,41 +61,15 @@ architectures.forEach { slug, architecture ->
         dependsOn(tasks.named(extractNativeLibTaskName))
     }
 
-    tasks.register(downloadWheelTaskName, DownloadPgmFile) {
+    def downloadWheel = tasks.register(downloadWheelTaskName, DownloadPgmFile) {
         downloadUrl.set(architecture.url.toString())
         destination.set(architecture.wheelFile)
     }
 
-    tasks.register(extractNativeLibTaskName, Copy) {
-        dependsOn(tasks.named(downloadWheelTaskName))
-
-        RegularFile wheelFile = architecture.wheelFile
-        RegularFile nativeLibFile = architecture.nativeLibFile
-        String nativeLibFilename = nativeLibFile.asFile.name
-        String nativeLibPathInWheel = architecture.nativeLibPathInWheel
-
-        // Ensure the target directory exists before extracting the library
-        doFirst {
-            nativeLibDir.asFile.mkdirs()
-        }
-
-        // Register the file as an output of the task to ensure Gradle tracks it correctly
-        outputs.file(nativeLibFile)
-
-        from(zipTree(wheelFile)) {
-            include nativeLibPathInWheel
-
-            eachFile { FileCopyDetails details ->
-                if (details.path == null) {
-                    return
-                }
-                println(details.path)
-                details.path = nativeLibFilename
-            }
-        }
-
-        includeEmptyDirs false
-        into(nativeLibDir)
+    tasks.register(extractNativeLibTaskName, ExtractPgmNativeLibrary) {
+        wheel.set(downloadWheel.flatMap { it.destination })
+        entryPath.set(architecture.nativeLibPathInWheel)
+        destination.set(architecture.nativeLibFile)
     }
 }
 
