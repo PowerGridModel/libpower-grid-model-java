@@ -12,9 +12,10 @@ SPDX-License-Identifier: MPL-2.0
 
 The PGM methods are available through class `org.lfenergy.pgm.PowerGridModelC`. The method names are identical to the method names in the C-documentation.
 
-To load the native library there are two options:
-- on supported architectures, the library can be autoloaded using `PGMLoader.autoload()`
-- on other architecture, you can build and load the library yourself using `System.load(...)`, and verify if you've loaded it correctly using `PGMLoader.check()`.
+Use `PGMLoader.autoload()` to load the packaged native library, or call
+`System.load(...)` from the same class loader as the bindings and then use
+`PGMLoader.check(true)` to verify its version. On Java 25, enable native access
+for the module using the bindings (use `--enable-native-access=ALL-UNNAMED` on the classpath).
 
 ## Supported architectures
 
@@ -24,6 +25,56 @@ To load the native library there are two options:
 - Linux x86-64
 - Windows x86-64
 
+## Building from source
+
+Use a native Java 25 JDK, CMake 3.20 or newer, a native C/C++ toolchain with
+system headers, and **LLVM/Clang 23.1.4** with the LibTooling development
+libraries and CMake package files. Set `PGM_LLVM_DIR` (or `-PpgmLlvmDir=...`)
+to that installation's absolute prefix. On macOS, install the Xcode command-line
+tools for the SDK. On Ubuntu, the official LLVM archive also needs the
+`libxml2-dev`, `libzstd-dev`, and `zlib1g-dev` packages. On Windows, use an
+x86-64 toolchain with the Windows SDK and MSVC headers.
+Then run `./gradlew build --configuration-cache` (or
+`.\gradlew.bat build --configuration-cache` on Windows). Consumers of the JAR
+do not need Clang, CMake, or jextract.
+
+The pinned Linux x86-64 wheel's public C headers drive generation on every host.
+Clang parses them with the host's target and system headers. Fixed-width integers,
+`size_t`, supported C primitives, pointers, opaque handles, enum constants,
+pointer globals, and fixed-prototype callbacks are supported. Plain `long`
+and `unsigned long`, variadic functions, and aggregates or enums passed by
+value are not. On a wheel upgrade, review unsupported declarations at the
+reported header location instead of dropping exports. The supported targets
+must expose equivalent declarations and generate identical Java files.
+
+PGM-facing function, layout, and callback helpers are retained. The generated
+API no longer exposes incidental system headers, the host-specific `C_LONG`
+layout, or setters for const metadata globals. Const metadata `$segment()`
+helpers expose a read-only pointer slot. A pointer returned by a binding does
+not transfer ownership or establish a safe accessible extent. In particular,
+read logger callback data only during the callback and only for the supplied
+length, keep the stub's arena alive, and do not throw from a callback.
+
+### Verifying a build on another supported host
+
+At the same Git commit and with the same pinned tools, compare against the
+reference `build/pgm/binding-fingerprint.json` from `./gradlew fingerprintPGMBindings`.
+Save the reference outside the local build output and pass it to the same task
+as `-PpgmBindingReference=/absolute/path/to/reference.json`. It compares normalized
+declarations and SHA-256 digests of the generated Java files, using the same
+Linux x86-64 wheel as input on both hosts.
+
+Verify the reference JAR's checksum separately, then compile and run the smoke
+test against that exact JAR without rebuilding it:
+
+```sh
+javac -cp path/to/reference.jar -d build/pgm/verification buildSrc/verification/BindingSmoke.java
+java --enable-native-access=ALL-UNNAMED -cp "path/to/reference.jar:build/pgm/verification" BindingSmoke
+```
+
+Use `;` instead of `:` as the classpath separator on Windows. To test explicit
+loading in a fresh JVM, rerun the `java` command with the path to the matching
+native library (extracted from the reference JAR) after `BindingSmoke`.
 
 ## Checklist after creating a repository from this template
 

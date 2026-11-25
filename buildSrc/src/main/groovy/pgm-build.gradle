@@ -2,9 +2,12 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+import pgm.BindingFingerprint
+import pgm.BuildPgmExtractor
 import pgm.DownloadPgmFile
+import pgm.EmitPgmBindings
+import pgm.ExtractPgmDeclarations
 import pgm.ExtractPgmNativeLibrary
-import pgm.GeneratePgmBindings
 import pgm.WritePgmVersion
 
 def pgmVersion = project.property("pgmVersion")
@@ -73,14 +76,10 @@ architectures.forEach { slug, architecture ->
     }
 }
 
-tasks.register("extractPGMHeaderFiles", Copy) {
+def extractHeaders = tasks.register("extractPGMHeaderFiles", Sync) {
     dependsOn(tasks.named("downloadPGMWheel_x86_64_linux"))
 
     RegularFile wheelFile = architectures.x86_64_linux.wheelFile
-
-    doFirst {
-        headersDir.asFile.mkdirs()
-    }
 
     def internalBaseDir = "power_grid_model/_core/power_grid_model_c/include"
     from(zipTree(wheelFile)) {
@@ -98,76 +97,53 @@ tasks.register("extractPGMHeaderFiles", Copy) {
     into headersDir
 }
 
-def jextractDir = layout.buildDirectory.dir("jextract").get()
-def jextractArchive = jextractDir.file("jextract.tar.gz")
-
-def osName = System.getProperty("os.name").toLowerCase()
-def osArch = System.getProperty("os.arch").toLowerCase()
-
-def jextractUrlPropertyKey = {
-    if (osName.contains("linux")) {
-        return osArch in ["aarch64", "arm64"]
-                ? "jextract_linux_aarch64_url"
-                : "jextract_linux_x64_url"
-    }
-
-    if (osName.contains("mac")) {
-        return osArch in ["aarch64", "arm64"]
-                ? "jextract_macos_aarch64_url"
-                : "jextract_macos_x64_url"
-    }
-
-    if (osName.contains("windows")) {
-        if (!(osArch in ["amd64", "x86_64"])) {
-            throw new GradleException(
-                    "Unsupported Windows architecture: $osArch"
-            )
+def osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+def windows = osName.contains("windows")
+def llvmRoot = providers.gradleProperty("pgmLlvmDir").orElse(providers.environmentVariable("PGM_LLVM_DIR"))
+def nativeTool = pgmDir.dir("native-tool")
+def executablePath = windows ? "bin/pgm-extract.exe" : "bin/pgm-extract"
+def buildExtractor = tasks.register("buildPGMExtractor", BuildPgmExtractor) {
+    source.set(layout.projectDirectory.dir("buildSrc/src/main/native/pgm-bindings"))
+    llvmDirectory.set(llvmRoot)
+    inputs.files(llvmRoot.map { path ->
+        ["llvm/LLVMConfigVersion.cmake", "clang/ClangConfigVersion.cmake"].collect {
+            new File(path, "lib/cmake/${it}")
         }
-
-        return "jextract_windows_x64_url"
-    }
-
-    throw new GradleException(
-            "Unsupported platform: $osName / $osArch"
-    )
-}()
-
-def jextractUrl = project.property(jextractUrlPropertyKey)
-
-tasks.register("downloadJextract", DownloadPgmFile) {
-    downloadUrl.set(jextractUrl)
-    destination.set(jextractArchive)
+    }.orElse([])).withPropertyName("llvmPackageVersions").withPathSensitivity(PathSensitivity.NONE)
+    output.set(nativeTool)
 }
 
-tasks.register("extractJextract", Copy) {
-    dependsOn(tasks.named("downloadJextract"))
-    from tarTree(resources.gzip(jextractArchive.asFile))
-    into jextractDir
+def sdk = providers.gradleProperty("pgmClangSdk")
+if (osName.contains("mac")) {
+    sdk = sdk.orElse(providers.exec { commandLine "xcrun", "--show-sdk-path" }.standardOutput.asText.map { it.trim() })
 }
-
-tasks.register("generatePGMBindings", GeneratePgmBindings) {
-    // Use a local jextract installation by setting jextract_bin in gradle.properties,
-    // otherwise jextract is downloaded and extracted automatically.
-    def localJextractBin = project.findProperty("jextract_bin")
-    if (localJextractBin) {
-        jextractExecutables.from(file(localJextractBin))
-    } else {
-        dependsOn(tasks.named('extractJextract'))
-        def executableName = osName.contains("windows") ? "jextract.exe" : "jextract"
-        jextractExecutables.from(fileTree(jextractDir) {
-            include "**/bin/$executableName"
-        })
-    }
-    dependsOn(tasks.named('extractPGMHeaderFiles'))
-    pgmHeader.set(headersDir.file("power_grid_model_c.h"))
-    datasetDefinitionsHeader.set(headersDir.file("power_grid_model_c/dataset_definitions.h"))
-    generatedJavaDirectory.set(generatedJavaDir)
+def inspect = tasks.register("inspectPGMDeclarations", ExtractPgmDeclarations) {
+    dependsOn(extractHeaders)
+    extractor.set(buildExtractor.flatMap { it.output.file(executablePath) })
+    headerDirectory.set(headersDir)
+    sdkDirectory.set(sdk)
+    it.windows.set(windows)
+    llvmDirectory.set(llvmRoot)
+    platform.set("$osName/${System.getProperty('os.arch')}".toString())
+    inventory.set(pgmDir.file("declarations.json"))
+}
+def generate = tasks.register("generatePGMBindings", EmitPgmBindings) {
+    inventory.set(inspect.flatMap { it.inventory })
+    output.set(generatedJavaDir)
+}
+def referencePath = providers.gradleProperty("pgmBindingReference")
+tasks.register("fingerprintPGMBindings", BindingFingerprint) {
+    inventory.set(inspect.flatMap { it.inventory })
+    sourceDirectory.set(generate.flatMap { it.output })
+    wheelVersion.set(pgmVersion)
+    destination.set(pgmDir.file("binding-fingerprint.json"))
+    reference.set(layout.projectDirectory.file(referencePath))
 }
 
 sourceSets {
     main {
         java {
-            srcDir generatedJavaDir
+            srcDir generate.flatMap { it.output }
         }
         resources {
             srcDir nativeLibDir
