@@ -15,8 +15,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Java equivalent of power_grid_model_c_example/main.c
  * <p>
  * Network topology: source_0 --node_1---- sym_load_2 | |---- sym_load_3
- * <p>
- * NOTE: The generated PowerGridModelC_1 class hardcodes the .so path at generation time. If the library has moved, re-run jextract or update SYMBOL_LOOKUP manually.
  */
 public final class PowerGridModelExample {
 

@@ -38,6 +38,16 @@ runs:
         java-version: ${{ inputs.java_version }}
         distribution: 'temurin'
 
+    - name: Set up PGM binding toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y clang libclang-dev llvm-dev libxml2-dev libzstd-dev zlib1g-dev
+        prefix="$(llvm-config --prefix)"
+        "$prefix/bin/clang" --version
+        echo "PGM_LLVM_DIR=$prefix" >> "$GITHUB_ENV"
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # 6.2.0
       with:
