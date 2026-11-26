@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <exception>
 #include <limits>
 #include <map>
 #include <memory>
@@ -35,17 +36,31 @@ std::string normalized(std::string path) {
 
 bool unsignedInteger(CXTypeKind kind) {
     switch (kind) {
-    case CXType_Char_U: case CXType_UChar: case CXType_UShort: case CXType_UInt:
-    case CXType_ULong: case CXType_ULongLong: case CXType_UInt128: return true;
-    default: return false;
+    case CXType_Char_U:
+    case CXType_UChar:
+    case CXType_UShort:
+    case CXType_UInt:
+    case CXType_ULong:
+    case CXType_ULongLong:
+    case CXType_UInt128:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool signedInteger(CXTypeKind kind) {
     switch (kind) {
-    case CXType_Char_S: case CXType_SChar: case CXType_Short: case CXType_Int:
-    case CXType_Long: case CXType_LongLong: case CXType_Int128: return true;
-    default: return false;
+    case CXType_Char_S:
+    case CXType_SChar:
+    case CXType_Short:
+    case CXType_Int:
+    case CXType_Long:
+    case CXType_LongLong:
+    case CXType_Int128:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -58,14 +73,14 @@ class Consumer {
     std::string root;
     std::string target;
     std::map<std::string, Binding> bindings;
-    CXCursor declaration{};
+    CXCursor declaration = clang_getNullCursor();
     std::string location;
     bool failed = false;
 
     void reject(const std::string& reason) {
         failed = true;
-        llvm::errs() << location << ": error: " << text(clang_getCursorSpelling(declaration))
-                     << " [" << target << "]: " << reason << '\n';
+        llvm::errs() << location << ": error: " << text(clang_getCursorSpelling(declaration)) << " [" << target
+                     << "]: " << reason << '\n';
     }
 
     std::optional<Object> unsupported(CXType type, const std::string& reason) {
@@ -101,9 +116,7 @@ class Consumer {
         if (clang_isVolatileQualifiedType(type) || clang_isRestrictQualifiedType(type)) {
             return unsupported(type, "volatile and restrict qualifiers are unsupported");
         }
-        auto shape = [&](std::string kind) {
-            return Object{{"kind", std::move(kind)}, {"const", isConst}};
-        };
+        auto shape = [&](std::string kind) { return Object{{"kind", std::move(kind)}, {"const", isConst}}; };
         auto hasLayout = [&](long long bytes) {
             return clang_Type_getSizeOf(type) == bytes && clang_Type_getAlignOf(type) == bytes;
         };
@@ -114,16 +127,21 @@ class Consumer {
             auto alias = clang_getTypeDeclaration(type);
             auto name = text(clang_getCursorSpelling(alias));
             auto bytes = llvm::StringSwitch<int>(name)
-                .Case("int8_t", 1).Case("uint8_t", 1)
-                .Case("int16_t", 2).Case("uint16_t", 2)
-                .Case("int32_t", 4).Case("uint32_t", 4)
-                .Case("int64_t", 8).Case("uint64_t", 8)
-                .Case("size_t", 8).Default(0);
+                             .Case("int8_t", 1)
+                             .Case("uint8_t", 1)
+                             .Case("int16_t", 2)
+                             .Case("uint16_t", 2)
+                             .Case("int32_t", 4)
+                             .Case("uint32_t", 4)
+                             .Case("int64_t", 8)
+                             .Case("uint64_t", 8)
+                             .Case("size_t", 8)
+                             .Default(0);
             if (bytes) {
                 auto kind = clang_getCanonicalType(type).kind;
                 bool isUnsigned = name.front() == 'u' || name == "size_t";
-                if (!clang_Location_isInSystemHeader(clang_getCursorLocation(alias))
-                    || !(isUnsigned ? unsignedInteger(kind) : signedInteger(kind)) || !hasLayout(bytes)) {
+                if (!clang_Location_isInSystemHeader(clang_getCursorLocation(alias)) ||
+                    !(isUnsigned ? unsignedInteger(kind) : signedInteger(kind)) || !hasLayout(bytes)) {
                     return unsupported(type, "unexpected size, signedness or alignment of standard type");
                 }
                 return shape(std::move(name));
@@ -154,25 +172,31 @@ class Consumer {
         case CXType_Record: {
             auto record = clang_getTypeDeclaration(type);
             auto name = text(clang_getCursorSpelling(record));
-            if (pointee && clang_Cursor_isNull(clang_getCursorDefinition(record))
-                && !clang_Cursor_isAnonymous(record) && !name.empty()) {
+            if (pointee && clang_Cursor_isNull(clang_getCursorDefinition(record)) &&
+                !clang_Cursor_isAnonymous(record) && !name.empty()) {
                 auto result = shape("opaque");
                 result["name"] = std::move(name);
                 return result;
             }
             break;
         }
-        case CXType_Void: return shape("void");
-        case CXType_Char_S: case CXType_Char_U:
-            if (hasLayout(1)) return shape("char");
+        case CXType_Void:
+            return shape("void");
+        case CXType_Char_S:
+        case CXType_Char_U:
+            if (hasLayout(1))
+                return shape("char");
             return unsupported(type, "unexpected primitive width or alignment");
         case CXType_Int:
-            if (hasLayout(4)) return shape("int");
+            if (hasLayout(4))
+                return shape("int");
             return unsupported(type, "unexpected primitive width or alignment");
         case CXType_Double:
-            if (hasLayout(8)) return shape("double");
+            if (hasLayout(8))
+                return shape("double");
             return unsupported(type, "unexpected primitive width or alignment");
-        default: break;
+        default:
+            break;
         }
         return unsupported(type, "unsupported type in the portable PGM API");
     }
@@ -194,25 +218,32 @@ class Consumer {
             bool dll = false;
             std::optional<std::string> visibility;
         } attrs;
-        clang_visitChildren(cursor, [](CXCursor child, CXCursor, CXClientData data) {
-            auto& attrs = *static_cast<Attributes*>(data);
-            switch (clang_getCursorKind(child)) {
-            case CXCursor_DLLImport: case CXCursor_DLLExport:
-                attrs.dll = true;
-                break;
-            case CXCursor_VisibilityAttr:
-                attrs.visibility = text(clang_getCursorSpelling(child));
-                break;
-            default: break;
-            }
-            return CXChildVisit_Continue;
-        }, &attrs);
+        clang_visitChildren(
+            cursor,
+            [](CXCursor child, CXCursor, CXClientData data) {
+                auto& attrs = *static_cast<Attributes*>(data);
+                switch (clang_getCursorKind(child)) {
+                case CXCursor_DLLImport:
+                case CXCursor_DLLExport:
+                    attrs.dll = true;
+                    break;
+                case CXCursor_VisibilityAttr:
+                    attrs.visibility = text(clang_getCursorSpelling(child));
+                    break;
+                default:
+                    break;
+                }
+                return CXChildVisit_Continue;
+            },
+            &attrs);
         if (attrs.dll) {
             return true;
         }
         if (attrs.visibility) {
-            if (*attrs.visibility == "default") return true;
-            if (*attrs.visibility == "hidden" || *attrs.visibility == "protected") return false;
+            if (*attrs.visibility == "default")
+                return true;
+            if (*attrs.visibility == "hidden" || *attrs.visibility == "protected")
+                return false;
             reject("unrecognized explicit PGM visibility annotation");
         } else if (clang_getCursorLinkage(cursor) == CXLinkage_External) {
             reject("external declaration is missing a public or hidden PGM visibility annotation");
@@ -224,11 +255,12 @@ class Consumer {
         CXFile file = nullptr;
         unsigned line = 0, column = 0;
         clang_getExpansionLocation(clang_getCursorLocation(cursor), &file, &line, &column, nullptr);
-        if (!file) return;
+        if (!file)
+            return;
         auto path = normalized(text(clang_getFileName(file)));
         llvm::StringRef relative(path);
-        if (!relative.consume_front(root)
-            || (relative != "power_grid_model_c.h" && !relative.starts_with("power_grid_model_c/"))) {
+        if (!relative.consume_front(root) ||
+            (relative != "power_grid_model_c.h" && !relative.starts_with("power_grid_model_c/"))) {
             return;
         }
         declaration = cursor;
@@ -245,16 +277,19 @@ class Consumer {
             break;
         case CXCursor_VarDecl:
             if (exported(cursor)) {
-                if (clang_getCanonicalType(type).kind != CXType_Pointer || clang_getCursorTLSKind(cursor) != CXTLS_None
-                    || clang_Cursor_getStorageClass(cursor) != CX_SC_Extern
-                    || !clang_Cursor_isNull(clang_Cursor_getVarDeclInitializer(cursor))) {
-                    reject("expected a non-thread-local extern pointer declaration, got " + text(clang_getTypeSpelling(type)));
+                if (clang_getCanonicalType(type).kind != CXType_Pointer ||
+                    clang_getCursorTLSKind(cursor) != CXTLS_None ||
+                    clang_Cursor_getStorageClass(cursor) != CX_SC_Extern ||
+                    !clang_Cursor_isNull(clang_Cursor_getVarDeclInitializer(cursor))) {
+                    reject("expected a non-thread-local extern pointer declaration, got " +
+                           text(clang_getTypeSpelling(type)));
                 } else if (auto pointer = describe(type)) {
                     add(cursor, Object{{"kind", "global"}, {"type", std::move(*pointer)}});
                 }
             }
             break;
-        case CXCursor_TypedefDecl: case CXCursor_TypeAliasDecl: {
+        case CXCursor_TypedefDecl:
+        case CXCursor_TypeAliasDecl: {
             auto underlying = clang_getTypedefDeclUnderlyingType(cursor);
             if (auto description = describe(underlying, clang_getCanonicalType(underlying).kind == CXType_Record)) {
                 add(cursor, Object{{"kind", "typedef"}, {"type", std::move(*description)}});
@@ -262,50 +297,64 @@ class Consumer {
             break;
         }
         case CXCursor_EnumDecl:
-            clang_visitChildren(cursor, [](CXCursor child, CXCursor parent, CXClientData data) {
-                if (clang_getCursorKind(child) == CXCursor_EnumConstantDecl) {
-                    auto& self = *static_cast<Consumer*>(data);
-                    auto value = clang_getEnumConstantDeclValue(child);
-                    auto kind = clang_getCanonicalType(clang_getEnumDeclIntegerType(parent)).kind;
-                    if (value < std::numeric_limits<std::int32_t>::min() || value > std::numeric_limits<std::int32_t>::max()
-                        || (unsignedInteger(kind) && clang_getEnumConstantDeclUnsignedValue(child) > std::numeric_limits<std::int32_t>::max())) {
-                        self.declaration = child;
-                        self.reject("enum constant does not fit the Java int carrier");
-                    } else {
-                        self.add(child, Object{{"kind", "constant"}, {"value", value}});
+            clang_visitChildren(
+                cursor,
+                // libclang fixes the visitor's parameter order.
+                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                [](CXCursor child, CXCursor parent, CXClientData data) {
+                    if (clang_getCursorKind(child) == CXCursor_EnumConstantDecl) {
+                        auto& self = *static_cast<Consumer*>(data);
+                        auto value = clang_getEnumConstantDeclValue(child);
+                        auto kind = clang_getCanonicalType(clang_getEnumDeclIntegerType(parent)).kind;
+                        if (value < std::numeric_limits<std::int32_t>::min() ||
+                            value > std::numeric_limits<std::int32_t>::max() ||
+                            (unsignedInteger(kind) && clang_getEnumConstantDeclUnsignedValue(child) >
+                                                          std::numeric_limits<std::int32_t>::max())) {
+                            self.declaration = child;
+                            self.reject("enum constant does not fit the Java int carrier");
+                        } else {
+                            self.add(child, Object{{"kind", "constant"}, {"value", value}});
+                        }
                     }
-                }
-                return CXChildVisit_Continue;
-            }, this);
+                    return CXChildVisit_Continue;
+                },
+                this);
             break;
-        case CXCursor_StructDecl: case CXCursor_UnionDecl: break;
-        default: reject("unsupported public declaration form");
+        case CXCursor_StructDecl:
+        case CXCursor_UnionDecl:
+            break;
+        default:
+            reject("unsupported public declaration form");
         }
     }
 
-public:
-    Consumer(std::string root, std::string target)
-        : root(normalized(std::move(root))), target(std::move(target)) {
-        if (this->root.back() != '/') this->root += '/';
+  public:
+    Consumer(std::string root, std::string target) : root(normalized(std::move(root))), target(std::move(target)) {
+        if (this->root.back() != '/')
+            this->root += '/';
     }
 
     std::optional<Object> extract(CXTranslationUnit tu) {
-        clang_visitChildren(clang_getTranslationUnitCursor(tu), [](CXCursor cursor, CXCursor, CXClientData data) {
-            static_cast<Consumer*>(data)->visit(cursor);
-            return CXChildVisit_Continue;
-        }, this);
-        if (failed || bindings.empty()) return std::nullopt;
+        clang_visitChildren(
+            clang_getTranslationUnitCursor(tu),
+            [](CXCursor cursor, CXCursor, CXClientData data) {
+                static_cast<Consumer*>(data)->visit(cursor);
+                return CXChildVisit_Continue;
+            },
+            this);
+        if (failed || bindings.empty())
+            return std::nullopt;
         Array declarations;
         for (auto& [name, binding] : bindings) {
-            declarations.emplace_back(Object{{"name", name}, {"location", binding.location},
-                {"shape", std::move(binding.shape)}});
+            declarations.emplace_back(
+                Object{{"name", name}, {"location", binding.location}, {"shape", std::move(binding.shape)}});
         }
         return Object{{"target", target}, {"declarations", std::move(declarations)}};
     }
 };
-}
+} // namespace
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc < 3 || !*argv[1]) {
         llvm::errs() << "usage: pgm-extract <absolute-header-directory> <absolute-clang-path> [clang flags...]\n";
         return 2;
@@ -318,12 +367,13 @@ int main(int argc, char** argv) {
     std::unique_ptr<void, decltype(&clang_disposeIndex)> index(clang_createIndex(0, 0), clang_disposeIndex);
     CXTranslationUnit parsed = nullptr;
     auto status = clang_parseTranslationUnit2FullArgv(index.get(), input.Filename, flags.data(),
-        static_cast<int>(flags.size()), &input, 1, 0, &parsed);
+                                                      static_cast<int>(flags.size()), &input, 1, 0, &parsed);
     if (status != CXError_Success) {
         llvm::errs() << "PGM header parse failed (libclang error " << status << ")\n";
         return 1;
     }
-    std::unique_ptr<CXTranslationUnitImpl, decltype(&clang_disposeTranslationUnit)> tu(parsed, clang_disposeTranslationUnit);
+    std::unique_ptr<CXTranslationUnitImpl, decltype(&clang_disposeTranslationUnit)> tu(parsed,
+                                                                                       clang_disposeTranslationUnit);
     bool parseFailed = false;
     for (unsigned i = 0, count = clang_getNumDiagnostics(tu.get()); i < count; ++i) {
         auto diagnostic = clang_getDiagnostic(tu.get(), i);
@@ -331,7 +381,8 @@ int main(int argc, char** argv) {
         parseFailed |= clang_getDiagnosticSeverity(diagnostic) >= CXDiagnostic_Error;
         clang_disposeDiagnostic(diagnostic);
     }
-    if (parseFailed) return 1;
+    if (parseFailed)
+        return 1;
     auto targetInfo = clang_getTranslationUnitTargetInfo(tu.get());
     auto target = text(clang_TargetInfo_getTriple(targetInfo));
     clang_TargetInfo_dispose(targetInfo);
@@ -341,4 +392,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     llvm::outs() << llvm::formatv("{0}\n", Value(std::move(*result)));
+} catch (const std::exception& error) {
+    llvm::errs() << "PGM header extraction failed: " << error.what() << '\n';
+    return 1;
 }

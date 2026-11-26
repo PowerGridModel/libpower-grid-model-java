@@ -26,9 +26,9 @@ To load the native library there are two options:
 
 ## Building from source
 
-Install Java 25, CMake 3.20+, a native C/C++ toolchain with system headers, and
-matching LLVM and Clang development packages with libclang and CMake package
-files. Use Xcode command-line tools on macOS or the Windows SDK and MSVC headers
+Install Java 25, CMake 3.20+, a native toolchain with C++23 support and system
+headers, and matching LLVM and Clang development packages with libclang and CMake
+package files. Use Xcode command-line tools on macOS or the Windows SDK and MSVC headers
 on Windows. On Ubuntu, install `clang`, `libclang-dev`, `llvm-dev`,
 `libxml2-dev`, `libzstd-dev`, and `zlib1g-dev`.
 
