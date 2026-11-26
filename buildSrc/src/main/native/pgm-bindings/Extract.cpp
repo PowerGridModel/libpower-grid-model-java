@@ -362,7 +362,7 @@ int main(int argc, char** argv) try {
     constexpr char source[] = "#include <power_grid_model_c.h>\n#include <power_grid_model_c/dataset_definitions.h>\n";
     CXUnsavedFile input{"pgm-bindings.c", source, sizeof(source) - 1};
     // libclang takes a full argv so Clang can locate its resource headers relative to the installed driver.
-    std::vector<char const*> flags{argv[2], "-x", "c", "-std=c2x", "-Werror", "-I", argv[1]};
+    std::vector<char const*> flags{argv[2], "-x", "c", "-std=c11", "-Werror", "-I", argv[1]};
     flags.insert(flags.end(), argv + 3, argv + argc);
     std::unique_ptr<void, decltype(&clang_disposeIndex)> index(clang_createIndex(0, 0), clang_disposeIndex);
     CXTranslationUnit parsed = nullptr;
