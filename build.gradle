@@ -231,7 +231,7 @@ tasks.register("generatePGMBindings") {
             jextractBin = file(localJextractBin)
         } else {
             def executableName = osName.contains("windows")
-                    ? "jextract.exe"
+                    ? "jextract.bat"
                     : "jextract"
             def jextractBins = jextractExecutables.files.findAll() {
                 it.name == executableName
