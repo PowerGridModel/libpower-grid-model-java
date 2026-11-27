@@ -6,6 +6,7 @@ package org.lfenergy.pgm.loader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -69,7 +70,7 @@ public class ResourceLibraryLoaderTest {
         verify(dependencies, times(1)).resourceIsFile(resourceURL);
         verify(dependencies, never()).copyIntoTemporaryFile(any(), any(), any());
         verify(dependencies, times(1)).loadNativeLibrary(systemLoadCaptor.capture());
-        assertEquals(resourceURL.getFile(), systemLoadCaptor.getValue());
+        assertEquals(Path.of(resourceURL.toURI()).toString(), systemLoadCaptor.getValue());
     }
 
     /**
@@ -81,8 +82,8 @@ public class ResourceLibraryLoaderTest {
     @MethodSource("testProvider")
     void testWhenResourceIsNotFile(String resourceLibraryPath) throws Exception {
 
-        final String expectedPathString = "/foo/bar";
-        final Path expectedPath = Path.of(expectedPathString);
+        final String expectedSuffix = resourceLibraryPath.substring(resourceLibraryPath.lastIndexOf('.'));
+        final Path expectedPath = Path.of("pgm-native-test" + expectedSuffix).toAbsolutePath();
         final URL resourceURL = PowerGridModelC.class.getResource(resourceLibraryPath);
 
         when(dependencies.copyIntoTemporaryFile(any(), any(), any()))
@@ -98,9 +99,9 @@ public class ResourceLibraryLoaderTest {
 
         verify(dependencies, times(1)).openResource(resourceLibraryPath);
         verify(dependencies, times(1)).resourceIsFile(resourceURL);
-        verify(dependencies, times(1)).copyIntoTemporaryFile(any(), any(), any());
+        verify(dependencies, times(1)).copyIntoTemporaryFile(any(), eq("pgm-native-"), eq(expectedSuffix));
         verify(dependencies, times(1)).loadNativeLibrary(systemLoadCaptor.capture());
-        assertEquals(expectedPathString, systemLoadCaptor.getValue());
+        assertEquals(expectedPath.toString(), systemLoadCaptor.getValue());
     }
 
     static Stream<Arguments> testProvider() {

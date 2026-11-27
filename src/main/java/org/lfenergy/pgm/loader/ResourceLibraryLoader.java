@@ -101,10 +101,15 @@ final class ResourceLibraryLoader {
                 return Path.of(resourceUrl.toURI());
             }
 
+            // Resource names use '/' regardless of the host filesystem.
+            // Preserve the native library extension (e.g. .dll) and ignore dots in resource directories.
+            final int extensionStart = resourceLibraryPath.lastIndexOf('.');
+            final String suffix = extensionStart > resourceLibraryPath.lastIndexOf('/')
+                ? resourceLibraryPath.substring(extensionStart)
+                : null;
+
             try (InputStream in = new BufferedInputStream(resourceUrl.openStream())) {
-                return dependencies.copyIntoTemporaryFile(
-                    in, "pgm-native-", resourceLibraryPath.replace('.', '-')
-                );
+                return dependencies.copyIntoTemporaryFile(in, "pgm-native-", suffix);
             }
         } catch (Exception e) {
             throw new PGMLoaderException("Failed to open packaged native library", e);
