@@ -1,0 +1,150 @@
+// SPDX-FileCopyrightText: Contributors to the Power Grid Model project <powergridmodel@lfenergy.org>
+//
+// SPDX-License-Identifier: MPL-2.0
+
+import pgm.BuildPgmExtractor
+import pgm.DownloadPgmFile
+import pgm.EmitPgmBindings
+import pgm.ExtractPgmDeclarations
+import pgm.ExtractPgmNativeLibrary
+import pgm.WritePgmVersion
+
+def pgmVersion = project.property("pgmVersion")
+
+def pgmDir = layout.buildDirectory.dir("pgm").get()
+def wheelDir = pgmDir.dir("download")
+def headersDir = pgmDir.dir("headers")
+def nativeLibDir = pgmDir.dir("lib")
+def generatedJavaDir = pgmDir.dir("generated-src")
+
+def architectures = [
+    "x86_64_macosx": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-macosx_13_0_x86_64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_macosx.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib/libpower_grid_model_c.dylib",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_macosx.dylib")
+    ],
+    "arm64_macosx": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-macosx_13_0_arm64.whl",
+        wheelFile: wheelDir.file("power_grid_model_arm64_macosx.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib/libpower_grid_model_c.dylib",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_arm64_macosx.dylib")
+    ],
+    "x86_64_windows": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-win_amd64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_windows.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/bin/power_grid_model_c.dll",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_windows.dll")
+    ],
+    "arm64_linux": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl",
+        wheelFile: wheelDir.file("power_grid_model_arm64_linux.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib64/libpower_grid_model_c.so",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_arm64_linux.so")
+    ],
+    "x86_64_linux": [
+        url: "https://github.com/PowerGridModel/power-grid-model/releases/download/v$pgmVersion/power_grid_model-$pgmVersion-py3-none-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+        wheelFile: wheelDir.file("power_grid_model_x86_64_linux.whl"),
+        nativeLibPathInWheel: "power_grid_model/_core/power_grid_model_c/lib64/libpower_grid_model_c.so",
+        nativeLibFile: nativeLibDir.file("power_grid_model_c_x86_64_linux.so")
+    ]
+]
+
+tasks.register("extractPGMNativeLibsFromWheels", WritePgmVersion) {
+    it.pgmVersion.set(pgmVersion)
+    versionFile.set(nativeLibDir.file("version"))
+}
+
+architectures.forEach { slug, architecture ->
+    def downloadWheelTaskName = "downloadPGMWheel_$slug"
+    def extractNativeLibTaskName = "extractPGMNativeLibFromWheel_$slug"
+
+    tasks.named("extractPGMNativeLibsFromWheels") {
+        dependsOn(tasks.named(extractNativeLibTaskName))
+    }
+
+    def downloadWheel = tasks.register(downloadWheelTaskName, DownloadPgmFile) {
+        downloadUrl.set(architecture.url.toString())
+        destination.set(architecture.wheelFile)
+    }
+
+    tasks.register(extractNativeLibTaskName, ExtractPgmNativeLibrary) {
+        wheel.set(downloadWheel.flatMap { it.destination })
+        entryPath.set(architecture.nativeLibPathInWheel)
+        destination.set(architecture.nativeLibFile)
+    }
+}
+
+def extractHeaders = tasks.register("extractPGMHeaderFiles", Sync) {
+    dependsOn(tasks.named("downloadPGMWheel_x86_64_linux"))
+
+    RegularFile wheelFile = architectures.x86_64_linux.wheelFile
+
+    def internalBaseDir = "power_grid_model/_core/power_grid_model_c/include"
+    from(zipTree(wheelFile)) {
+        include "$internalBaseDir/**/*.h"
+
+        eachFile { FileCopyDetails details ->
+            if (details.path == null) {
+                return
+            }
+
+            details.path = details.path.replace("$internalBaseDir/", "")
+        }
+    }
+    includeEmptyDirs false
+    into headersDir
+}
+
+def osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+def windows = osName.contains("windows")
+def llvmRoot = providers.gradleProperty("pgmLlvmDir").orElse(providers.environmentVariable("PGM_LLVM_DIR"))
+def nativeTool = pgmDir.dir("native-tool")
+def executablePath = windows ? "bin/pgm-extract.exe" : "bin/pgm-extract"
+def buildExtractor = tasks.register("buildPGMExtractor", BuildPgmExtractor) {
+    source.set(layout.projectDirectory.dir("buildSrc/src/main/native/pgm-bindings"))
+    llvmDirectory.set(llvmRoot)
+    inputs.files(llvmRoot.map { path ->
+        ["llvm/LLVMConfigVersion.cmake", "clang/ClangConfigVersion.cmake"].collect {
+            new File(path, "lib/cmake/${it}")
+        }
+    }.orElse([])).withPropertyName("llvmPackageVersions").withPathSensitivity(PathSensitivity.NONE)
+    output.set(nativeTool)
+}
+
+def sdk = providers.gradleProperty("pgmClangSdk")
+if (osName.contains("mac")) {
+    sdk = sdk.orElse(providers.exec { commandLine "xcrun", "--show-sdk-path" }.standardOutput.asText.map { it.trim() })
+}
+def inspect = tasks.register("inspectPGMDeclarations", ExtractPgmDeclarations) {
+    dependsOn(extractHeaders)
+    extractor.set(buildExtractor.flatMap { it.output.file(executablePath) })
+    headerDirectory.set(headersDir)
+    sdkDirectory.set(sdk)
+    it.windows.set(windows)
+    llvmDirectory.set(llvmRoot)
+    platform.set("$osName/${System.getProperty('os.arch')}".toString())
+    inventory.set(pgmDir.file("declarations.json"))
+}
+def generate = tasks.register("generatePGMBindings", EmitPgmBindings) {
+    inventory.set(inspect.flatMap { it.inventory })
+    output.set(generatedJavaDir)
+}
+sourceSets {
+    main {
+        java {
+            srcDir generate.flatMap { it.output }
+        }
+        resources {
+            srcDir nativeLibDir
+        }
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn(tasks.named('generatePGMBindings'))
+}
+
+tasks.named('processResources') {
+    dependsOn(tasks.named('extractPGMNativeLibsFromWheels'))
+}

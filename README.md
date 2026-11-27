@@ -13,8 +13,8 @@ SPDX-License-Identifier: MPL-2.0
 The PGM methods are available through class `org.lfenergy.pgm.PowerGridModelC`. The method names are identical to the method names in the C-documentation.
 
 To load the native library there are two options:
-- on supported architectures, the library can be autoloaded using `PGMLoader.autoload()`
-- on other architecture, you can build and load the library yourself using `System.load(...)`, and verify if you've loaded it correctly using `PGMLoader.check()`.
+- on supported architectures, the library can be autoloaded using `new PGMLoader().autoload()`
+- on other architectures, you can build and load the library yourself using `System.load(...)`, and verify it using `new PGMLoader().check(true)`.
 
 ## Supported architectures
 
@@ -24,6 +24,32 @@ To load the native library there are two options:
 - Linux x86-64
 - Windows x86-64
 
+## Building from source
+
+Install Java 25, CMake 3.20+, a native toolchain with C++23 support and system
+headers, and matching LLVM and Clang development packages with libclang and CMake
+package files. Use Xcode command-line tools on macOS or the Windows SDK and MSVC headers
+on Windows. On Ubuntu, install `clang`, `libclang-dev`, `llvm-dev`,
+`libxml2-dev`, `libzstd-dev`, and `zlib1g-dev`.
+
+Set `PGM_LLVM_DIR` to the absolute LLVM install path (or pass `-PpgmLlvmDir=...`)
+and run `./gradlew build --configuration-cache` (`gradlew.bat` on Windows).
+The pinned Linux x86-64 wheel supplies the C headers on every host. JAR
+consumers don't need LLVM or CMake.
+
+The generated API omits system-header helpers, `C_LONG`, and setters for const metadata.
+
+### Verifying a build on another supported host
+
+Verify the reference JAR's checksum and smoke-test that same JAR:
+
+```sh
+javac -cp path/to/reference.jar -d build/pgm/verification buildSrc/verification/BindingSmoke.java
+java --enable-native-access=ALL-UNNAMED -cp "path/to/reference.jar:build/pgm/verification" BindingSmoke
+```
+
+On Windows, use `;` in the classpath. To test explicit loading, pass the path
+to the matching library extracted from the JAR as an argument to `BindingSmoke`.
 
 ## Checklist after creating a repository from this template
 
